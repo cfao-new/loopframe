@@ -16,6 +16,7 @@ const state = {
   preparedStale: true,
   processing: false,
   processVersion: 0,
+  connectionPending: false,
   transform: {
     fit: "contain",
     template: "none",
@@ -117,6 +118,45 @@ function selectedDevice() {
   return state.devices.find((device) => device.id === state.selectedDeviceId) || null;
 }
 
+function savedDevicePlaceholder() {
+  const settings = state.settings;
+  if (!settings?.deviceId || !settings?.deviceName) return null;
+  const savedScreen = settings.deviceScreen;
+  const screen = savedScreen && Number(savedScreen.width) > 0
+    ? savedScreen
+    : {
+        width: 225,
+        height: 400,
+        nativeWidth: 225,
+        nativeHeight: 400,
+        orientation: "portrait",
+        source: "fallback",
+        confidence: "unverified",
+      };
+  return {
+    id: settings.deviceId,
+    deviceId: settings.deviceInstanceId || String(settings.deviceId).split(":").at(-1),
+    sourceApp: settings.deviceSourceApp || "access",
+    name: settings.deviceName,
+    model: settings.deviceModel || "Saved device",
+    type: "",
+    firmware: "",
+    connected: false,
+    hasBackground: settings.deviceUploadStatus === "verified",
+    screen,
+    catalogId: screen.catalogId || null,
+    artworkAspectRatio: 0.35,
+    upload: {
+      transport: settings.deviceUploadTransport || "",
+      status: settings.deviceUploadStatus || "unsupported",
+      animated: settings.deviceUploadStatus === "verified" ? "verified" : "experimental",
+      reason: "Connecting to the console to refresh this saved device.",
+    },
+    artworkUrl: settings.deviceArtworkUrl || "",
+    artworkFallbackUrl: settings.deviceArtworkFallbackUrl || "",
+  };
+}
+
 function uploadStatus(device) {
   return device?.upload?.status || "unsupported";
 }
@@ -162,7 +202,13 @@ function currentView() {
 }
 
 function showView(name) {
-  if (name === "studio" && !state.devices.length) name = "setup";
+  if (
+    name === "studio" &&
+    !state.devices.length &&
+    !(state.settings?.deviceId && state.settings?.deviceName)
+  ) {
+    name = "setup";
+  }
   for (const view of elements.views) {
     view.classList.toggle("is-active", view.id === `${name}-view`);
   }
@@ -269,6 +315,7 @@ function applySelectedArtwork() {
 }
 
 async function hydrateDeviceArtwork() {
+  if (state.connectionPending) return;
   const pending = state.devices.filter(
     (device) =>
       device.artworkUrl &&
@@ -385,6 +432,14 @@ async function finishSetup() {
       password: elements.setupPassword.value,
       deviceId: state.selectedDeviceId,
       deviceName: device?.name || "",
+      deviceInstanceId: device?.deviceId || "",
+      deviceModel: device?.model || device?.type || "",
+      deviceSourceApp: device?.sourceApp || "",
+      deviceScreen: device?.screen || null,
+      deviceUploadTransport: device?.upload?.transport || "",
+      deviceUploadStatus: device?.upload?.status || "unsupported",
+      deviceArtworkUrl: device?.artworkUrl || "",
+      deviceArtworkFallbackUrl: device?.artworkFallbackUrl || "",
       rememberController: elements.rememberController.checked,
       rememberSignIn: elements.rememberSignin.checked,
       keepHistory: true,
@@ -707,8 +762,7 @@ async function publishPrepared() {
   }
 }
 
-async function loadSettingsForm() {
-  state.settings = await api.getSettings();
+function applySettingsToForm() {
   elements.setupHost.value = state.settings.host || "";
   elements.setupUser.value = state.settings.username || "";
   elements.rememberController.checked = state.settings.rememberController !== false;
@@ -720,10 +774,20 @@ async function loadSettingsForm() {
   renderExperimentalSettings();
 }
 
+async function loadSettingsForm() {
+  state.settings = await api.getSettings();
+  applySettingsToForm();
+}
+
 async function attemptSavedConnection() {
   if (!state.settings?.host || !state.settings?.passwordStored) return false;
+  state.connectionPending = true;
+  document.body.dataset.connectionPending = "true";
+  elements.globalStatus.innerHTML = '<span class="status-dot"></span><span>Connecting</span>';
   try {
     const result = await api.refreshDevices();
+    state.connectionPending = false;
+    document.body.dataset.connectionPending = "false";
     state.profile = result.profile;
     state.devices = result.devices;
     state.protectStatus = result.protectStatus;
@@ -735,6 +799,9 @@ async function attemptSavedConnection() {
     elements.globalStatus.innerHTML = `<span class="status-dot"></span><span>${result.profile.name || "Connected"}</span>`;
     return true;
   } catch {
+    state.connectionPending = false;
+    document.body.dataset.connectionPending = "false";
+    elements.globalStatus.innerHTML = '<span class="status-dot"></span><span>Connection unavailable</span>';
     return false;
   }
 }
@@ -742,8 +809,12 @@ async function attemptSavedConnection() {
 async function refreshDevices() {
   const button = elements.refreshDevices;
   button.disabled = true;
+  state.connectionPending = true;
+  document.body.dataset.connectionPending = "true";
   try {
     const result = await api.refreshDevices();
+    state.connectionPending = false;
+    document.body.dataset.connectionPending = "false";
     state.profile = result.profile;
     state.devices = result.devices;
     state.protectStatus = result.protectStatus;
@@ -756,6 +827,8 @@ async function refreshDevices() {
     renderExperimentalSettings();
     toast("Device list refreshed.");
   } catch (error) {
+    state.connectionPending = false;
+    document.body.dataset.connectionPending = "false";
     toast(messageFromError(error), "error");
   } finally {
     button.disabled = false;
@@ -1188,12 +1261,18 @@ async function initialize() {
     deviceCapabilityCopy: $("#device-capability-copy"),
   });
 
-  state.meta = await api.getMeta();
-  state.donation = await api.getDonation();
+  const [meta, donation, settings] = await Promise.all([
+    api.getMeta(),
+    api.getDonation(),
+    api.getSettings(),
+  ]);
+  state.meta = meta;
+  state.donation = donation;
+  state.settings = settings;
   populateControls();
   setupEventHandlers();
   new ResizeObserver(() => applyLivePreview()).observe(elements.previewScreen);
-  await loadSettingsForm();
+  applySettingsToForm();
   elements.versionLabel.textContent = `Loopframe ${state.meta.version}`;
   if (!state.meta.credentialVault) {
     elements.rememberSignin.disabled = true;
@@ -1213,13 +1292,41 @@ async function initialize() {
     elements.donationLink.hidden = true;
   }
 
-  const connected = await attemptSavedConnection();
-  if (connected) {
+  const placeholder = savedDevicePlaceholder();
+  const restoreSavedSession = Boolean(
+    state.settings.host &&
+    state.settings.passwordStored &&
+    placeholder,
+  );
+  if (restoreSavedSession) {
+    state.connectionPending = true;
+    document.body.dataset.connectionPending = "true";
+    state.devices = [placeholder];
+    state.selectedDeviceId = placeholder.id;
+    renderDevices();
     showView("studio");
-  } else {
+    elements.globalStatus.innerHTML = '<span class="status-dot"></span><span>Connecting</span>';
+    refreshIcons();
+    void attemptSavedConnection().then((connected) => {
+      if (connected) showView("studio");
+      refreshIcons();
+    });
+  } else if (placeholder) {
+    document.body.dataset.connectionPending = "false";
+    state.devices = [placeholder];
+    state.selectedDeviceId = placeholder.id;
+    renderDevices();
     showView("setup");
+    elements.globalStatus.innerHTML = '<span class="status-dot"></span><span>Needs sign in</span>';
+    refreshIcons();
+  } else {
+    document.body.dataset.connectionPending = "false";
+    state.devices = [];
+    state.selectedDeviceId = "";
+    renderDevices();
+    showView("setup");
+    refreshIcons();
   }
-  refreshIcons();
 }
 
 initialize().catch((error) => {

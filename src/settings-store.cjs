@@ -38,6 +38,14 @@ class SettingsStore {
       username: "",
       deviceId: "",
       deviceName: "",
+      deviceInstanceId: "",
+      deviceModel: "",
+      deviceSourceApp: "",
+      deviceScreen: null,
+      deviceUploadTransport: "",
+      deviceUploadStatus: "",
+      deviceArtworkUrl: "",
+      deviceArtworkFallbackUrl: "",
       rememberController: true,
       rememberSignIn: false,
       keepHistory: true,
@@ -60,6 +68,26 @@ class SettingsStore {
       username: String(value.username || "").trim(),
       deviceId: String(value.deviceId || "").trim(),
       deviceName: String(value.deviceName || "").trim(),
+      deviceInstanceId: String(
+        value.deviceInstanceId ?? current.deviceInstanceId ?? "",
+      ).trim(),
+      deviceModel: String(value.deviceModel ?? current.deviceModel ?? "").trim(),
+      deviceSourceApp: String(
+        value.deviceSourceApp ?? current.deviceSourceApp ?? "",
+      ).trim(),
+      deviceScreen: value.deviceScreen ?? current.deviceScreen ?? null,
+      deviceUploadTransport: String(
+        value.deviceUploadTransport ?? current.deviceUploadTransport ?? "",
+      ).trim(),
+      deviceUploadStatus: String(
+        value.deviceUploadStatus ?? current.deviceUploadStatus ?? "",
+      ).trim(),
+      deviceArtworkUrl: String(
+        value.deviceArtworkUrl ?? current.deviceArtworkUrl ?? "",
+      ).trim(),
+      deviceArtworkFallbackUrl: String(
+        value.deviceArtworkFallbackUrl ?? current.deviceArtworkFallbackUrl ?? "",
+      ).trim(),
       rememberController: value.rememberController !== false,
       rememberSignIn: Boolean(value.rememberSignIn),
       keepHistory: value.keepHistory !== false,

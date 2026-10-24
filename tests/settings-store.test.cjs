@@ -24,6 +24,13 @@ test("settings survive a reload and credentials use protected storage", async ()
       password: "not-a-real-password",
       deviceId: "device-1",
       deviceName: "Front door",
+      deviceInstanceId: "raw-device-1",
+      deviceModel: "G6 Pro Entry",
+      deviceSourceApp: "access",
+      deviceScreen: { width: 480, height: 854, confidence: "verified" },
+      deviceUploadTransport: "access-background",
+      deviceUploadStatus: "verified",
+      deviceArtworkUrl: "https://static.ui.com/fingerprint/ui/example.png",
       rememberController: true,
       rememberSignIn: true,
       keepHistory: true,
@@ -33,6 +40,10 @@ test("settings survive a reload and credentials use protected storage", async ()
     const settings = await reloaded.readSettings();
     assert.equal(settings.host, "https://console.example");
     assert.equal(settings.username, "loopframe-admin");
+    assert.equal(settings.deviceInstanceId, "raw-device-1");
+    assert.equal(settings.deviceModel, "G6 Pro Entry");
+    assert.equal(settings.deviceScreen.width, 480);
+    assert.equal(settings.deviceUploadTransport, "access-background");
     assert.equal(settings.passwordStored, true);
     assert.equal(await reloaded.readPassword(), "not-a-real-password");
   } finally {

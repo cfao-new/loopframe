@@ -53,6 +53,7 @@ async function createMockConsole() {
   let currentBgs = "backgrounds/original.png";
   let currentProtectLcd = {};
   let origin;
+  let topologyDelayMs = 0;
   const mockArtwork = await sharp(Buffer.from(`
     <svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
       <rect x="210" y="44" width="92" height="424" rx="18" fill="#1b221e"/>
@@ -94,6 +95,9 @@ async function createMockConsole() {
       return;
     }
     if (url.pathname === "/proxy/access/api/v2/devices/topology4") {
+      if (topologyDelayMs) {
+        await new Promise((resolve) => setTimeout(resolve, topologyDelayMs));
+      }
       send(200, {
         code: 1,
         data: [{
@@ -222,6 +226,9 @@ async function createMockConsole() {
   return {
     origin,
     events,
+    setTopologyDelay: (milliseconds) => {
+      topologyDelayMs = milliseconds;
+    },
     close: () => new Promise((resolve) => server.close(resolve)),
   };
 }
@@ -322,6 +329,7 @@ try {
 
   await page.locator("#find-devices").click();
   await page.locator(".device-option").waitFor();
+  await page.locator("#remember-signin").check();
   assert.equal(await page.locator(".device-option").count(), 1);
   assert.match(await page.locator(".device-option").innerText(), /480 x 854/);
   assert.equal(
@@ -330,6 +338,22 @@ try {
   );
   await page.locator("#finish-setup").click();
   await page.locator("#studio-view.is-active").waitFor();
+  await page.locator("#selected-device-artwork").waitFor({ state: "visible" });
+
+  mock.setTopologyDelay(4000);
+  const startupStarted = Date.now();
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() =>
+    document.body.dataset.connectionPending === "true" &&
+    document.querySelector("#studio-view")?.classList.contains("is-active")
+  );
+  const startupMs = Date.now() - startupStarted;
+  assert.ok(startupMs < 2500, "saved studio should render before network refresh");
+  await page.waitForFunction(
+    () => document.body.dataset.connectionPending === "false",
+    { timeout: 10000 },
+  );
+  mock.setTopologyDelay(0);
   await page.locator("#selected-device-artwork").waitFor({ state: "visible" });
 
   const desktopOverflow = await overflow(page);
@@ -578,6 +602,7 @@ try {
     removeConnection: true,
     removeAllData: true,
     donationSlot: true,
+    startupMs,
     desktopWidth: desktopOverflow.width,
     mobileWidth: mobileOverflow.width,
   }, null, 2));

@@ -7,6 +7,9 @@ import { _electron as electron } from "playwright";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
+const packageMeta = JSON.parse(
+  await fs.readFile(path.join(projectRoot, "package.json"), "utf8"),
+);
 const executablePath =
   process.env.LOOPFRAME_PACKAGED_EXECUTABLE ||
   path.join(projectRoot, "dist", "win-unpacked", "Loopframe.exe");
@@ -34,6 +37,10 @@ try {
     state: "attached",
     timeout: 15000,
   });
+  const windowVisible = await electronApp.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]?.isVisible()
+  );
+  assert.equal(windowVisible, true);
   const fitCount = await page.locator("#fit-grid .fit-option").count();
   if (fitCount !== 6) {
     console.log(JSON.stringify({
@@ -57,7 +64,7 @@ try {
   );
   const meta = await page.evaluate(() => window.loopframe.getMeta());
   const donation = await page.evaluate(() => window.loopframe.getDonation());
-  assert.equal(meta.version, "0.1.0");
+  assert.equal(meta.version, packageMeta.version);
   assert.equal(typeof meta.credentialVault, "boolean");
   if (process.platform === "win32") assert.equal(meta.credentialVault, true);
   assert.equal(donation.enabled, true);

@@ -4,16 +4,8 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { pathToFileURL } = require("node:url");
 const { SettingsStore } = require("./settings-store.cjs");
-const { UniFiClient, normalizeConsoleAddress } = require("./unifi-client.cjs");
-const { ProtectClient } = require("./protect-client.cjs");
-const {
-  inspectImage,
-  processImage,
-  FIT_MODES,
-  TEMPLATES,
-} = require("./image-processor.cjs");
+const { FIT_MODES, TEMPLATES } = require("./image-options.cjs");
 
-const isDevelopment = !app.isPackaged;
 const allowedImageExtensions = new Set([
   ".gif",
   ".png",
@@ -31,9 +23,34 @@ let activeClient;
 let activeProtectClient;
 let preparedDirectory;
 let artworkCacheDirectory;
+let imageProcessor;
+let networkRuntime;
 
 if (process.env.LOOPFRAME_USER_DATA) {
   app.setPath("userData", path.resolve(process.env.LOOPFRAME_USER_DATA));
+}
+
+function getImageProcessor() {
+  if (!imageProcessor) imageProcessor = require("./image-processor.cjs");
+  return imageProcessor;
+}
+
+function getNetworkRuntime() {
+  if (!networkRuntime) {
+    networkRuntime = {
+      ...require("./unifi-client.cjs"),
+      ...require("./protect-client.cjs"),
+    };
+  }
+  return networkRuntime;
+}
+
+async function ensurePreparedDirectory() {
+  if (!preparedDirectory) {
+    preparedDirectory = path.join(app.getPath("temp"), "loopframe-prepared");
+  }
+  await fs.mkdir(preparedDirectory, { recursive: true });
+  return preparedDirectory;
 }
 
 function profileSummary(profile) {
@@ -115,14 +132,14 @@ async function accessDevicesFor(client, experimental) {
 }
 
 async function protectDevicesFor(client) {
-  const protect = new ProtectClient(client);
+  const protect = new (getNetworkRuntime().ProtectClient)(client);
   const devices = await protect.listDevices();
   activeProtectClient = protect;
   return devices;
 }
 
 async function connect(host, username, password, options = {}) {
-  const client = new UniFiClient(host);
+  const client = new (getNetworkRuntime().UniFiClient)(host);
   const profile = await client.login(username, password);
   activeClient = client;
   activeProtectClient = null;
@@ -197,7 +214,7 @@ async function ensureProtectClient(settings, { allowAccessSession = true } = {})
   let sessionError = null;
   if (allowAccessSession && activeClient) {
     try {
-      const protect = new ProtectClient(activeClient);
+      const protect = new (getNetworkRuntime().ProtectClient)(activeClient);
       await protect.getBootstrap();
       activeProtectClient = protect;
       return protect;
@@ -209,7 +226,7 @@ async function ensureProtectClient(settings, { allowAccessSession = true } = {})
   if (settings.protectHost && settings.protectUsername) {
     const password = await store.readProtectPassword();
     if (password) {
-      consoleClient = new UniFiClient(settings.protectHost);
+      consoleClient = new (getNetworkRuntime().UniFiClient)(settings.protectHost);
       await consoleClient.login(settings.protectUsername, password);
     }
   }
@@ -217,7 +234,7 @@ async function ensureProtectClient(settings, { allowAccessSession = true } = {})
     if (sessionError) throw sessionError;
     return null;
   }
-  const protect = new ProtectClient(consoleClient);
+  const protect = new (getNetworkRuntime().ProtectClient)(consoleClient);
   await protect.getBootstrap();
   activeProtectClient = protect;
   return protect;
@@ -264,6 +281,7 @@ async function discoverSavedDevices() {
 }
 
 async function connectProtect(credentials) {
+  const { normalizeConsoleAddress } = getNetworkRuntime();
   const settings = await store.readSettings();
   const host = normalizeConsoleAddress(credentials.host || settings.host);
   if (!settings.host) {
@@ -272,9 +290,9 @@ async function connectProtect(credentials) {
   if (host !== normalizeConsoleAddress(settings.host)) {
     throw new Error("Protect must use the same UniFi console address.");
   }
-  const client = new UniFiClient(host);
+  const client = new (getNetworkRuntime().UniFiClient)(host);
   await client.login(credentials.username, credentials.password);
-  const protect = new ProtectClient(client);
+  const protect = new (getNetworkRuntime().ProtectClient)(client);
   const devices = await protect.listDevices();
   activeProtectClient = protect;
   await store.saveProtectConnection({
@@ -293,6 +311,9 @@ async function connectProtect(credentials) {
 }
 
 function assertPreparedPath(filePath) {
+  if (!preparedDirectory) {
+    throw new Error("Prepare an image before publishing.");
+  }
   const resolved = path.resolve(filePath);
   if (!resolved.startsWith(path.resolve(preparedDirectory) + path.sep)) {
     throw new Error("The prepared image path is outside the application workspace.");
@@ -320,6 +341,7 @@ async function readCachedArtwork(cacheKey, artworkUrl) {
 async function writeCachedArtwork(cacheKey, artwork) {
   const digest = crypto.createHash("sha256").update(String(cacheKey)).digest("hex");
   const cachePath = path.join(artworkCacheDirectory, `${digest}.json`);
+  await fs.mkdir(artworkCacheDirectory, { recursive: true });
   await fs.writeFile(cachePath, JSON.stringify(artwork), "utf8");
 }
 
@@ -365,8 +387,13 @@ async function createWindow() {
     }
   });
 
+  mainWindow.once("ready-to-show", () => {
+    if (!mainWindow?.isDestroyed()) mainWindow.show();
+  });
   await mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
-  mainWindow.once("ready-to-show", () => mainWindow.show());
+  if (!mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+    mainWindow.show();
+  }
 }
 
 function registerHandlers() {
@@ -441,7 +468,7 @@ function registerHandlers() {
     if (stat.size > 80 * 1024 * 1024) {
       throw new Error("The selected image is larger than 80 MB.");
     }
-    return inspectImage(sourcePath);
+    return getImageProcessor().inspectImage(sourcePath);
   });
 
   ipcMain.handle("image:process", async (_event, payload) => {
@@ -455,8 +482,12 @@ function registerHandlers() {
       throw new Error("The selected image is larger than 80 MB.");
     }
     const stamp = Date.now();
-    const outputPath = path.join(preparedDirectory, `loopframe-${stamp}.gif`);
-    const result = await processImage(payload.sourcePath, payload.options || {});
+    const outputDirectory = await ensurePreparedDirectory();
+    const outputPath = path.join(outputDirectory, `loopframe-${stamp}.gif`);
+    const result = await getImageProcessor().processImage(
+      payload.sourcePath,
+      payload.options || {},
+    );
     await fs.writeFile(outputPath, result.buffer);
     return {
       path: outputPath,
@@ -559,10 +590,7 @@ function registerHandlers() {
 app.whenReady().then(async () => {
   store = new SettingsStore(app.getPath("userData"), safeStorage);
   await store.initialize();
-  preparedDirectory = path.join(app.getPath("temp"), "loopframe-prepared");
   artworkCacheDirectory = path.join(app.getPath("userData"), "artwork-cache");
-  await fs.mkdir(preparedDirectory, { recursive: true });
-  await fs.mkdir(artworkCacheDirectory, { recursive: true });
   registerHandlers();
   await createWindow();
 

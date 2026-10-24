@@ -37,7 +37,8 @@ Command:
 npm run test:ui
 ```
 
-Result: passed at 1424 pixels and 430 pixels.
+Result: passed at 1424 pixels and 430 pixels. The saved studio became usable in
+138 ms while the console refresh was delayed by four seconds.
 
 Coverage:
 
@@ -62,6 +63,16 @@ Coverage:
 19. Optional donation link visibility and address validation.
 20. No horizontal overflow.
 21. No page errors or console errors.
+22. Saved studio rendering before a delayed console reconnection completes.
+
+## Windows Launcher Test
+
+The single file launcher was tested with a clean version cache:
+
+1. Cold launch, including extraction: 6.848 seconds.
+2. Three warm launches: 949, 865, and 893 milliseconds.
+3. The cached application was present in the current user's local application
+   data folder and no administrator access was used.
 
 ## Live Console Test
 

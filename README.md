@@ -176,13 +176,18 @@ npm run pack:linux
 npm run pack:mac
 ```
 
-Choose the command for the host system. Windows builds a portable executable,
-Linux builds an AppImage, and macOS builds ZIP files for Intel and Apple
-Silicon.
+Choose the command for the host system. Windows builds a portable executable
+and unpacked application, Linux builds an AppImage, and macOS builds ZIP files
+for Intel and Apple Silicon.
 
 The output is written to `dist`. macOS packages should be signed and notarized
 before public distribution. See [docs/PLATFORMS.md](docs/PLATFORMS.md) for the
 full release matrix and user instructions.
+
+The Windows executable prepares a private copy in the current user's
+`%LOCALAPPDATA%\Loopframe\app` folder on its first run. Later launches open
+that cached copy directly, which avoids paying the extraction cost again. The
+unpacked ZIP can also be opened directly from any folder the user chooses.
 
 The application does not require an installer, a system service, or operating
 system administrator rights. Each user gets a separate settings folder.

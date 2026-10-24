@@ -4,7 +4,7 @@
 
 | System | Processor | Package | First run |
 | --- | --- | --- | --- |
-| Windows 10 and 11 | Intel or AMD 64 bit | Portable EXE | Open the EXE |
+| Windows 10 and 11 | Intel or AMD 64 bit | Portable EXE or ZIP | Open the EXE |
 | Linux | Intel or AMD 64 bit | AppImage | Mark executable, then open |
 | macOS 12 or newer | Intel | ZIP | Open Loopframe.app |
 | macOS 12 or newer | Apple Silicon | ZIP | Open Loopframe.app |
@@ -17,6 +17,11 @@ the desktop keyring when Electron reports it as available.
 The packaged application does not need a separate runtime, installer, system
 service, or administrator password. Linux AppImage users may extract and run
 the package without FUSE.
+
+The Windows executable prepares its application files once in
+`%LOCALAPPDATA%\Loopframe\app\<version>` and opens that cached copy on later
+launches. The first launch includes the one time extraction cost. The Windows
+ZIP is available for users who prefer to choose the destination folder.
 
 ## Linux From Source
 
@@ -32,14 +37,14 @@ No root access is required after Node.js is installed. To build an AppImage:
 
 ```bash
 npm run pack:linux
-chmod +x dist/Loopframe-0.1.0-x86_64.AppImage
-./dist/Loopframe-0.1.0-x86_64.AppImage
+chmod +x dist/Loopframe-0.1.1-x86_64.AppImage
+./dist/Loopframe-0.1.1-x86_64.AppImage
 ```
 
 If FUSE is unavailable on the target computer, run:
 
 ```bash
-./dist/Loopframe-0.1.0-x86_64.AppImage --appimage-extract-and-run
+./dist/Loopframe-0.1.1-x86_64.AppImage --appimage-extract-and-run
 ```
 
 ## macOS From Source
@@ -68,7 +73,7 @@ This is an Apple platform requirement, not an installation requirement.
 
 The repository includes a GitHub Actions workflow that builds:
 
-1. Windows x64 portable EXE.
+1. Windows x64 portable EXE and unpacked ZIP.
 2. Linux x64 AppImage.
 3. macOS Intel ZIP.
 4. macOS Apple Silicon ZIP.
