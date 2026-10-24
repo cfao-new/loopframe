@@ -32,14 +32,14 @@ No root access is required after Node.js is installed. To build an AppImage:
 
 ```bash
 npm run pack:linux
-chmod +x dist/Loopframe-1.0.0-x86_64.AppImage
-./dist/Loopframe-1.0.0-x86_64.AppImage
+chmod +x dist/Loopframe-0.1.0-x86_64.AppImage
+./dist/Loopframe-0.1.0-x86_64.AppImage
 ```
 
 If FUSE is unavailable on the target computer, run:
 
 ```bash
-./dist/Loopframe-1.0.0-x86_64.AppImage --appimage-extract-and-run
+./dist/Loopframe-0.1.0-x86_64.AppImage --appimage-extract-and-run
 ```
 
 ## macOS From Source

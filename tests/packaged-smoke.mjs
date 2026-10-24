@@ -51,7 +51,7 @@ try {
   );
   const meta = await page.evaluate(() => window.loopframe.getMeta());
   const donation = await page.evaluate(() => window.loopframe.getDonation());
-  assert.equal(meta.version, "1.0.0");
+  assert.equal(meta.version, "0.1.0");
   assert.equal(meta.credentialVault, true);
   assert.equal(donation.enabled, true);
   assert.equal(donation.url, "https://buymeacoffee.com/cfao");

@@ -1,6 +1,6 @@
 {
   "name": "loopframe",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "A local desktop studio for UniFi Access backgrounds and Protect welcome images",
   "main": "src/main.cjs",
   "author": "cfao",
