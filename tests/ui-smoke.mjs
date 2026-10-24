@@ -15,6 +15,7 @@ const screenshotDirectory = path.join(projectRoot, "docs", "screenshots");
 const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "loopframe-ui-"));
 const userData = path.join(temporaryDirectory, "profile");
 const sourcePath = path.join(temporaryDirectory, "smoke-source.gif");
+const donationPath = path.join(temporaryDirectory, "donation.json");
 
 function makeSourceFrame(width, height, color) {
   const rgba = new Uint8Array(width * height * 4);
@@ -159,6 +160,14 @@ async function captureWindow(electronApp, filePath) {
 
 await createSourceGif();
 await fs.mkdir(screenshotDirectory, { recursive: true });
+await fs.writeFile(donationPath, JSON.stringify({
+  enabled: true,
+  service: "Buy Me a Coffee",
+  label: "Support this project",
+  url: "https://example.com/support",
+  placement: "footer",
+  promptOnLaunch: false,
+}, null, 2));
 const mock = await createMockConsole();
 let electronApp;
 
@@ -171,10 +180,11 @@ try {
       "dist",
       process.platform === "win32" ? "electron.exe" : "electron",
     ),
-    args: [projectRoot],
+    args: [projectRoot, "--disable-gpu"],
     env: {
       ...process.env,
       LOOPFRAME_USER_DATA: userData,
+      LOOPFRAME_DONATION_FILE: donationPath,
     },
   });
   const page = await electronApp.firstWindow();
@@ -198,6 +208,8 @@ try {
   assert.equal(fitCount, 6);
   assert.equal(await page.locator("#template-grid .template-option").count(), 5);
   assert.equal(await page.locator("#open-people").getAttribute("aria-disabled"), "true");
+  assert.equal(await page.locator("#donation-link").isVisible(), true);
+  assert.equal(await page.locator("#donation-link").getAttribute("href"), "https://example.com/support");
 
   await page.locator("#setup-host").fill(mock.origin);
   await page.locator("#setup-user").fill("loopframe-test");
@@ -289,6 +301,7 @@ try {
     restore: true,
     removeConnection: true,
     removeAllData: true,
+    donationSlot: true,
     desktopWidth: desktopOverflow.width,
     mobileWidth: mobileOverflow.width,
   }, null, 2));

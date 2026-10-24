@@ -43,8 +43,9 @@ Coverage:
 5. Zoom, horizontal and vertical movement, background color, and center reset.
 6. Review dialog, publication result, rollback list, and restore action.
 7. Connection removal and removal of every local setting.
-8. No horizontal overflow.
-9. No page errors or console errors.
+8. Optional donation link visibility and address validation.
+9. No horizontal overflow.
+10. No page errors or console errors.
 
 ## Live Console Test
 

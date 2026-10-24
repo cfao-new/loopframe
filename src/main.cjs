@@ -37,6 +37,9 @@ function profileSummary(profile) {
 }
 
 function donationPath() {
+  if (process.env.LOOPFRAME_DONATION_FILE) {
+    return path.resolve(process.env.LOOPFRAME_DONATION_FILE);
+  }
   return app.isPackaged
     ? path.join(process.resourcesPath, "donation.json")
     : path.join(__dirname, "..", "donation.json");
