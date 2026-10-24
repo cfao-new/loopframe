@@ -20,12 +20,12 @@
     "test:ui": "node tests/ui-smoke.mjs",
     "test:live": "node tests/run-live.cjs",
     "test:packaged": "node tests/packaged-smoke.mjs",
-    "pack:win": "electron-builder --win dir --x64 && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-launcher.ps1",
-    "pack:linux": "electron-builder --linux AppImage --x64",
-    "pack:mac": "node scripts/install-mac-sharp.cjs && electron-builder --mac zip --x64 --arm64",
-    "pack:mac:x64": "node scripts/install-mac-sharp.cjs && electron-builder --mac zip --x64",
-    "pack:mac:arm64": "node scripts/install-mac-sharp.cjs && electron-builder --mac zip --arm64",
-    "pack:dir": "electron-builder --dir"
+    "pack:win": "electron-builder --win dir --x64 --publish never && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-launcher.ps1",
+    "pack:linux": "electron-builder --linux AppImage --x64 --publish never",
+    "pack:mac": "node scripts/install-mac-sharp.cjs && electron-builder --mac zip --x64 --arm64 --publish never",
+    "pack:mac:x64": "node scripts/install-mac-sharp.cjs && electron-builder --mac zip --x64 --publish never",
+    "pack:mac:arm64": "node scripts/install-mac-sharp.cjs && electron-builder --mac zip --arm64 --publish never",
+    "pack:dir": "electron-builder --dir --publish never"
   },
   "dependencies": {
     "form-data": "^4.0.6",
