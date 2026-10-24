@@ -1176,6 +1176,7 @@ async function initialize() {
     removeAll: $("#remove-all"),
     backupList: $("#backup-list"),
     donationLink: $("#donation-link"),
+    headerDonationLink: $("#header-donation-link"),
     repoLink: $("#repo-link"),
     versionLabel: $("#version-label"),
     selectedDeviceArtwork: $("#selected-device-artwork"),
@@ -1200,12 +1201,15 @@ async function initialize() {
       "No protected credential service is available on this computer. The password stays in memory for this run.";
   }
   if (state.donation?.enabled && state.donation.url) {
-    configureDonationLink(
-      elements.donationLink,
-      state.donation,
-      (url) => api.openExternal(url).catch((error) => toast(messageFromError(error), "error")),
-    );
+    for (const link of [elements.headerDonationLink, elements.donationLink]) {
+      configureDonationLink(
+        link,
+        state.donation,
+        (url) => api.openExternal(url).catch((error) => toast(messageFromError(error), "error")),
+      );
+    }
   } else {
+    elements.headerDonationLink.hidden = true;
     elements.donationLink.hidden = true;
   }
 

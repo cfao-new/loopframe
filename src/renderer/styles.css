@@ -162,6 +162,28 @@ code {
   gap: 8px;
 }
 
+.topbar-donation {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  background: var(--surface);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.topbar-donation:hover {
+  color: var(--accent-strong);
+  border-color: var(--line-strong);
+  background: var(--accent-soft);
+}
+
+.topbar-donation svg {
+  width: 13px;
+  height: 13px;
+}
+
 .status,
 .inline-status,
 .badge {

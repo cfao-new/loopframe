@@ -39,6 +39,9 @@
     "appId": "com.cfao.loopframe",
     "productName": "Loopframe",
     "asar": true,
+    "asarUnpack": [
+      "node_modules/@img/**/*"
+    ],
     "directories": {
       "output": "dist"
     },

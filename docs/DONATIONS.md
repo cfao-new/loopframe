@@ -1,8 +1,8 @@
 # Donation Setup
 
-Loopframe uses a single optional link in the footer. The link is hidden until
-a valid web address is configured. It never opens by itself and never asks for
-support during setup or publication.
+Loopframe uses one optional support destination in both the header and footer.
+The links are hidden until a valid web address is configured. They never open
+by themselves and never ask for support during setup or publication.
 
 The current public support page is
 [`buymeacoffee.com/cfao`](https://buymeacoffee.com/cfao). The Portugal service
@@ -38,7 +38,7 @@ change their terms.
 | Ko-fi | Free page for tips, PayPal and Stripe options, direct settlement to the selected payment account, optional shop and memberships | Payment provider setup is required, some advanced options require a paid plan, interface has fewer consumer brand cues | Portugal and fee conscious creators with a community or storefront |
 | GitHub Sponsors | Trusted by developers, strong repository integration, recurring tiers, organization matching in some regions | Donors need GitHub accounts, eligibility review, tax and payout onboarding, less approachable for general consumers | Open source projects with a developer audience |
 
-Use Ko-fi for the Loopframe footer in Portugal. Use Buy Me a Coffee if the
+Use Ko-fi for Loopframe in Portugal. Use Buy Me a Coffee if the
 shortest, most familiar donor path matters more than lower platform cost. Use
 GitHub Sponsors only as a second channel for developers.
 
@@ -66,7 +66,7 @@ The helper updates `donation.json`. For another application, copy
 
 The component must:
 
-1. Appear only as a text link in a footer.
+1. Appear as a restrained header control and a text link in the footer.
 2. Remain hidden when no valid HTTPS address is configured.
 3. Use one short action label.
 4. Open in the system browser.

@@ -45,8 +45,13 @@ try {
   assert.equal(await page.locator("#experimental-screen-devices").isChecked(), false);
   assert.equal(await page.locator("#protect-connection").isHidden(), true);
   await page.locator("#donation-link").waitFor({ state: "visible" });
+  await page.locator("#header-donation-link").waitFor({ state: "visible" });
   assert.equal(
     await page.locator("#donation-link").getAttribute("href"),
+    "https://buymeacoffee.com/cfao",
+  );
+  assert.equal(
+    await page.locator("#header-donation-link").getAttribute("href"),
     "https://buymeacoffee.com/cfao",
   );
   const meta = await page.evaluate(() => window.loopframe.getMeta());

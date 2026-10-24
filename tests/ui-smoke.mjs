@@ -309,6 +309,11 @@ try {
   assert.equal(await page.locator("#open-people").getAttribute("aria-disabled"), "true");
   assert.equal(await page.locator("#donation-link").isVisible(), true);
   assert.equal(await page.locator("#donation-link").getAttribute("href"), "https://example.com/support");
+  assert.equal(await page.locator("#header-donation-link").isVisible(), true);
+  assert.equal(
+    await page.locator("#header-donation-link").getAttribute("href"),
+    "https://example.com/support",
+  );
 
   await page.locator("#setup-host").fill(mock.origin);
   await page.locator("#setup-user").fill("loopframe-test");

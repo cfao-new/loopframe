@@ -203,8 +203,9 @@ rollback action first.
 
 ## Donations
 
-The application supports one optional footer link. It does not show a modal,
-auto prompt, floating badge, or startup message.
+The application supports one optional support destination in the header and
+footer. The header link is noticeable but quiet. The application does not show
+a modal, auto prompt, floating badge, or startup message.
 
 See [docs/DONATIONS.md](docs/DONATIONS.md) for the service comparison and
 configuration steps. The recommended service for Portugal is **Ko-fi** because
