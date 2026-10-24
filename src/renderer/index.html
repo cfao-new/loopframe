@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'"
+  >
+  <meta name="color-scheme" content="light">
+  <title>Loopframe</title>
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="../../shared/donation-link.css">
+</head>
+<body>
+  <header class="topbar">
+    <button class="brand" id="brand-home" type="button" aria-label="Loopframe home">
+      <span class="brand-mark"><i data-lucide="repeat-2"></i></span>
+      <span>Loopframe</span>
+    </button>
+    <nav class="topnav" aria-label="Main">
+      <button class="nav-button" type="button" data-view-target="studio">
+        <i data-lucide="panels-top-left"></i><span>Studio</span>
+      </button>
+      <button class="nav-button" type="button" data-view-target="settings">
+        <i data-lucide="settings-2"></i><span>Settings</span>
+      </button>
+    </nav>
+    <div class="topbar-state">
+      <span class="status" id="global-status"><span class="status-dot"></span><span>Local only</span></span>
+      <button class="icon-button" id="refresh-devices" type="button" aria-label="Refresh devices" title="Refresh devices">
+        <i data-lucide="refresh-cw"></i>
+      </button>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <section class="view is-active" id="setup-view" aria-labelledby="setup-title">
+      <div class="setup-layout">
+        <form class="panel setup-panel" id="setup-form">
+          <header class="page-heading">
+            <p class="eyebrow">First run</p>
+            <h1 id="setup-title">Connect your console</h1>
+            <p>Use one local account with the smallest practical permission set. Loopframe finds compatible Access devices for you.</p>
+          </header>
+
+          <div class="notice">
+            <span class="notice-icon"><i data-lucide="shield-check"></i></span>
+            <div>
+              <strong>Access Full Admin only</strong>
+              <span>No Network or Protect permission is needed. No API key, SSH, cloud relay, or operating system administrator right is needed.</span>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <label class="field full">
+              <span>UniFi console address</span>
+              <span class="input-wrap"><i data-lucide="server"></i><input id="setup-host" name="host" type="text" placeholder="https://192.168.1.1" autocomplete="url"></span>
+              <small>Enter only the console address. Do not include <code>/access</code> or another path.</small>
+            </label>
+            <label class="field">
+              <span>Local username or email</span>
+              <span class="input-wrap"><i data-lucide="user-round"></i><input id="setup-user" name="username" type="text" placeholder="loopframe-admin" autocomplete="username"></span>
+            </label>
+            <label class="field">
+              <span>Password</span>
+              <span class="input-wrap">
+                <i data-lucide="key-round"></i>
+                <input id="setup-password" name="password" type="password" placeholder="Required" autocomplete="current-password">
+                <button class="icon-button input-action" type="button" id="show-password" aria-label="Show password"><i data-lucide="eye"></i></button>
+              </span>
+            </label>
+          </div>
+
+          <details class="help">
+            <summary><i data-lucide="circle-help"></i><span>How to create the account</span><i data-lucide="chevron-down"></i></summary>
+            <div class="help-body">
+              <p>Open <code>https://&lt;console&gt;/network/default/admins</code>, then choose <strong>Network &gt; People</strong>. A current Owner or Super Admin must create the role and person.</p>
+              <ol class="steps">
+                <li><span>1</span><span>Open <strong>Roles</strong>, choose <strong>Create New Role</strong>, select <strong>Admin</strong>, and name it <strong>Loopframe</strong>.</span></li>
+                <li><span>2</span><span>Set <strong>Access</strong> to <strong>Full Admin</strong>. Set Network, Protect, InnerSpace, Control Plane, and every other application to <strong>None</strong>.</span></li>
+                <li><span>3</span><span>Return to <strong>People</strong>, choose <strong>Add New Person</strong>, select <strong>Admin</strong>, and assign the <strong>Loopframe</strong> role.</span></li>
+                <li><span>4</span><span>Turn on <strong>Local Account Only</strong>. Leave <strong>Door Access</strong> off unless this person also needs to open doors.</span></li>
+              </ol>
+              <div class="scope-note">
+                <strong>Do not grant All Applications or Super Admin.</strong>
+                <span>UniFi does not provide a background only permission. Access Full Admin is the narrowest setting that can upload and apply a GIF. View Only and Door Attendant cannot.</span>
+              </div>
+              <button class="text-link" id="open-people" type="button" aria-disabled="true">
+                <span>Open this console's People page</span><i data-lucide="external-link"></i>
+              </button>
+            </div>
+          </details>
+
+          <div class="setup-actions">
+            <button class="button" id="find-devices" type="button"><i data-lucide="plug-zap"></i><span>Find devices</span></button>
+            <span class="inline-status" id="connection-status">Not connected</span>
+          </div>
+
+          <section class="device-section" id="device-section" hidden>
+            <header>
+              <div><h2>Compatible device</h2><p>Choose the screen where the background should appear.</p></div>
+              <span class="badge" id="device-count">0 found</span>
+            </header>
+            <div class="device-list" id="device-list" role="radiogroup" aria-label="Compatible device"></div>
+          </section>
+
+          <div class="setup-options" id="setup-options" hidden>
+            <label class="check-row">
+              <input id="remember-controller" type="checkbox" checked>
+              <span><strong>Remember this connection</strong><small>Save the console, account name, device, and preferences.</small></span>
+            </label>
+            <label class="check-row">
+              <input id="remember-signin" type="checkbox">
+              <span><strong>Keep me signed in</strong><small>Store the password with your operating system's protected credential service. Off by default.</small></span>
+            </label>
+            <button class="button primary" id="finish-setup" type="button"><span>Open studio</span><i data-lucide="arrow-right"></i></button>
+          </div>
+        </form>
+
+        <aside class="setup-aside">
+          <section class="panel compact-panel">
+            <span class="panel-icon"><i data-lucide="door-open"></i></span>
+            <h2 id="aside-device-name">No device selected</h2>
+            <p id="aside-device-meta">Connect to list compatible Access hardware.</p>
+            <dl class="facts">
+              <div><dt>Console</dt><dd id="aside-host">Not connected</dd></div>
+              <div><dt>Account</dt><dd id="aside-account">Not signed in</dd></div>
+              <div><dt>Password</dt><dd id="aside-password">Not stored</dd></div>
+            </dl>
+          </section>
+          <section class="panel compact-panel">
+            <h2>What stays local</h2>
+            <ul class="plain-list">
+              <li><i data-lucide="check"></i><span>Files open from their current location.</span></li>
+              <li><i data-lucide="check"></i><span>No analytics or relay service.</span></li>
+              <li><i data-lucide="check"></i><span>Saved settings can be removed here.</span></li>
+            </ul>
+          </section>
+        </aside>
+      </div>
+    </section>
+
+    <section class="view" id="studio-view" aria-labelledby="studio-title">
+      <header class="studio-heading">
+        <div>
+          <p class="eyebrow">Background studio</p>
+          <h1 id="studio-title">Build the display</h1>
+          <p id="studio-device-copy">Choose an image, frame it, then review the generated GIF.</p>
+        </div>
+        <button class="button" id="choose-file-top" type="button"><i data-lucide="folder-open"></i><span>Choose image</span></button>
+      </header>
+
+      <div class="studio-grid">
+        <input id="file-input" type="file" accept=".gif,.png,.jpg,.jpeg,.webp,.avif,.tif,.tiff" hidden>
+        <aside class="panel file-panel">
+          <header class="panel-head">
+            <div><h2>Source</h2><p>Local files only</p></div>
+            <button class="icon-button" id="choose-file" type="button" aria-label="Choose image" title="Choose image"><i data-lucide="plus"></i></button>
+          </header>
+          <button class="drop-zone" id="drop-zone" type="button">
+            <span class="drop-icon"><i data-lucide="image-plus"></i></span>
+            <strong id="file-name">Choose an image</strong>
+            <span id="file-detail">GIF, PNG, JPEG, WebP, AVIF, or TIFF</span>
+          </button>
+          <div class="thumbnail" id="source-thumbnail">
+            <div class="empty-preview"><i data-lucide="images"></i><span>No source selected</span></div>
+          </div>
+          <dl class="facts">
+            <div><dt>Source size</dt><dd id="source-size">Not selected</dd></div>
+            <div><dt>Frames</dt><dd id="source-frames">Not selected</dd></div>
+            <div><dt>Duration</dt><dd id="source-duration">Not selected</dd></div>
+          </dl>
+        </aside>
+
+        <section class="stage-panel" aria-label="Background preview">
+          <header class="stage-head">
+            <div><span class="eyebrow">Screen 225 by 400</span><h2>Output preview</h2></div>
+            <span class="status" id="preview-status"><span class="status-dot"></span><span>Waiting for an image</span></span>
+          </header>
+          <div class="stage">
+            <div class="device">
+              <div class="device-camera"></div>
+              <div class="screen">
+                <div class="empty-preview" id="output-empty"><i data-lucide="scan-line"></i><span>Your framed GIF appears here</span></div>
+                <img id="output-preview" alt="Processed background preview" hidden>
+                <div class="safe-grid" id="safe-grid"></div>
+              </div>
+            </div>
+          </div>
+          <footer class="stage-foot">
+            <span id="preview-digest">No processed file</span>
+            <div class="stage-tools">
+              <label class="mini-toggle"><input id="show-grid" type="checkbox" checked><span>Guides</span></label>
+              <button class="icon-button" id="center-image" type="button" aria-label="Center image" title="Center image"><i data-lucide="focus"></i></button>
+            </div>
+          </footer>
+        </section>
+
+        <aside class="panel inspector">
+          <section class="inspector-section">
+            <header><h2>Scale</h2><button class="text-button" id="reset-transform" type="button">Reset</button></header>
+            <div class="fit-grid" id="fit-grid"></div>
+          </section>
+          <section class="inspector-section">
+            <header><h2>Template</h2><span class="badge">Optional</span></header>
+            <div class="template-grid" id="template-grid"></div>
+          </section>
+          <section class="inspector-section">
+            <header><h2>Refine</h2><span class="badge" id="zoom-value">100%</span></header>
+            <label class="range-row">
+              <span>Zoom</span>
+              <input id="zoom" type="range" min="25" max="250" step="1" value="100">
+            </label>
+            <label class="range-row">
+              <span>Horizontal</span>
+              <input id="offset-x" type="range" min="-100" max="100" step="1" value="0">
+            </label>
+            <label class="range-row">
+              <span>Vertical</span>
+              <input id="offset-y" type="range" min="-100" max="100" step="1" value="0">
+            </label>
+            <label class="field color-field">
+              <span>Background</span>
+              <span class="color-input"><input id="background-color" type="color" value="#111612"><output id="background-value">#111612</output></span>
+            </label>
+          </section>
+          <section class="inspector-section">
+            <header><h2>Device</h2></header>
+            <select id="device-select" aria-label="Publish device"></select>
+            <p class="muted" id="device-connection">Connect to select a device.</p>
+          </section>
+          <button class="button primary publish-button" id="review-publish" type="button" disabled><i data-lucide="upload"></i><span>Review upload</span></button>
+        </aside>
+      </div>
+    </section>
+
+    <section class="view" id="settings-view" aria-labelledby="settings-title">
+      <header class="page-heading settings-heading">
+        <p class="eyebrow">Settings</p>
+        <h1 id="settings-title">Connection and local data</h1>
+        <p>Review the console account, restore an earlier background, or remove local information.</p>
+      </header>
+      <div class="settings-grid">
+        <section class="panel settings-panel">
+          <header class="panel-head"><div><h2>Connection</h2><p id="settings-connection-copy">Not configured</p></div><button class="button" id="test-connection" type="button"><i data-lucide="plug-zap"></i><span>Test</span></button></header>
+          <dl class="facts wide">
+            <div><dt>Console</dt><dd id="settings-host">Not configured</dd></div>
+            <div><dt>Account</dt><dd id="settings-user">Not configured</dd></div>
+            <div><dt>Device</dt><dd id="settings-device">Not selected</dd></div>
+            <div><dt>Saved sign in</dt><dd id="settings-secret">Not stored</dd></div>
+          </dl>
+          <div class="settings-actions">
+            <button class="button" id="edit-connection" type="button"><i data-lucide="pencil"></i><span>Edit connection</span></button>
+            <button class="button danger" id="remove-connection" type="button"><i data-lucide="unlink"></i><span>Remove connection</span></button>
+          </div>
+        </section>
+        <section class="panel settings-panel">
+          <header class="panel-head"><div><h2>Rollback</h2><p>Only Loopframe uploads are listed.</p></div></header>
+          <div class="backup-list" id="backup-list"><p class="muted">No pending rollback records.</p></div>
+        </section>
+        <section class="panel settings-panel">
+          <header class="panel-head"><div><h2>Local footprint</h2><p>Everything stays on this computer.</p></div></header>
+          <ul class="plain-list">
+            <li><i data-lucide="hard-drive"></i><span>Preferences and rollback records use a few kilobytes.</span></li>
+            <li><i data-lucide="image"></i><span>Source images are never copied into permanent application storage.</span></li>
+            <li><i data-lucide="shield-check"></i><span>Passwords are stored only when requested and only through the operating system credential service.</span></li>
+          </ul>
+          <button class="button danger" id="remove-all" type="button"><i data-lucide="trash-2"></i><span>Delete all local data</span></button>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <span id="version-label">Loopframe</span>
+    <a href="https://github.com/cfao/loopframe" id="repo-link"><i data-lucide="github"></i><span>Source</span></a>
+    <a href="#" id="donation-link" class="donation-link" hidden><i data-lucide="coffee"></i><span data-donation-label>Support this project</span></a>
+  </footer>
+
+  <dialog id="publish-dialog">
+    <form method="dialog" class="dialog-card">
+      <header class="dialog-head">
+        <div><p class="eyebrow">Final check</p><h2>Publish this GIF?</h2></div>
+        <button class="icon-button" value="cancel" aria-label="Close"><i data-lucide="x"></i></button>
+      </header>
+      <div class="dialog-preview"><img id="dialog-preview" alt="Prepared GIF"></div>
+      <dl class="facts wide">
+        <div><dt>Device</dt><dd id="dialog-device">Not selected</dd></div>
+        <div><dt>Output</dt><dd id="dialog-output">Not prepared</dd></div>
+        <div><dt>Template</dt><dd id="dialog-template">No overlay</dd></div>
+        <div><dt>Digest</dt><dd id="dialog-digest">Not prepared</dd></div>
+      </dl>
+      <div class="notice compact">
+        <span class="notice-icon"><i data-lucide="history"></i></span>
+        <div><strong>A rollback record is saved first</strong><span>The prior background can be restored from Settings.</span></div>
+      </div>
+      <footer class="dialog-actions">
+        <button class="button" value="cancel">Cancel</button>
+        <button class="button primary" id="confirm-publish" type="button"><i data-lucide="upload"></i><span>Publish GIF</span></button>
+      </footer>
+    </form>
+  </dialog>
+
+  <div class="toast-region" id="toast-region" aria-live="polite"></div>
+
+  <script src="./vendor/lucide.min.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

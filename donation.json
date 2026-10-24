@@ -1,0 +1,8 @@
+{
+  "enabled": false,
+  "service": "Buy Me a Coffee",
+  "label": "Support this project",
+  "url": "",
+  "placement": "footer",
+  "promptOnLaunch": false
+}

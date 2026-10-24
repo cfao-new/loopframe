@@ -1,0 +1,44 @@
+{
+  "startedAt": "2026-10-24T15:15:00.048Z",
+  "status": "passed",
+  "account": {
+    "created": true,
+    "localOnly": true,
+    "applicationPermissions": {
+      "access": "Full Admin",
+      "others": "None"
+    }
+  },
+  "permissions": {
+    "accessTopology": "allowed",
+    "protectAdministration": "denied",
+    "networkAdministration": "denied"
+  },
+  "liveImages": 35,
+  "matrixCases": 30,
+  "staticFormatCases": 5,
+  "rollbackChecks": 35,
+  "fits": [
+    "fill",
+    "contain",
+    "width",
+    "height",
+    "original",
+    "stretch"
+  ],
+  "templates": [
+    "none",
+    "soft-bottom",
+    "soft-top",
+    "vignette",
+    "focus-frame"
+  ],
+  "failures": [],
+  "restoredExactBaseline": true,
+  "accountDeleted": true,
+  "roleDeleted": true,
+  "usersRestored": true,
+  "rolesRestored": true,
+  "temporaryDirectory": ".loopframe-test\\live-2854900041",
+  "completedAt": "2026-10-24T15:16:50.748Z"
+}

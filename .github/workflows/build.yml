@@ -1,0 +1,44 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  package:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            command: npm run pack:win
+          - os: ubuntu-latest
+            command: npx electron-builder --linux AppImage --x64
+          - os: macos-latest
+            command: npx electron-builder --mac zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: ${{ matrix.command }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Loopframe-${{ runner.os }}
+          path: dist/*

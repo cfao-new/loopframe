@@ -1,0 +1,73 @@
+{
+  "name": "loopframe",
+  "version": "1.0.0",
+  "description": "A local desktop studio for UniFi Access doorbell backgrounds",
+  "main": "src/main.cjs",
+  "author": "cfao",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.cjs",
+    "test:ui": "node tests/ui-smoke.mjs",
+    "test:live": "node tests/run-live.cjs",
+    "test:packaged": "node tests/packaged-smoke.mjs",
+    "pack:win": "electron-builder --win portable --x64",
+    "pack:dir": "electron-builder --dir"
+  },
+  "dependencies": {
+    "form-data": "^4.0.6",
+    "gifenc": "^1.0.3",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0",
+    "playwright": "^1.64.1"
+  },
+  "build": {
+    "appId": "com.cfao.loopframe",
+    "productName": "Loopframe",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "shared/**/*",
+      "package.json",
+      "LICENSE",
+      "NOTICE.md"
+    ],
+    "extraResources": [
+      {
+        "from": "donation.json",
+        "to": "donation.json"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Loopframe-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Graphics"
+    },
+    "mac": {
+      "target": [
+        "zip"
+      ],
+      "category": "public.app-category.graphics-design"
+    },
+    "icon": "build/icon.png"
+  }
+}

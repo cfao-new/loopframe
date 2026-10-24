@@ -1,0 +1,16 @@
+.donation-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+}
+
+.donation-link[hidden] {
+  display: none !important;
+}
+
+.donation-link:hover {
+  color: var(--accent, currentColor);
+}
