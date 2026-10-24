@@ -13,6 +13,8 @@
     "test:live": "node tests/run-live.cjs",
     "test:packaged": "node tests/packaged-smoke.mjs",
     "pack:win": "electron-builder --win portable --x64",
+    "pack:linux": "electron-builder --linux AppImage --x64",
+    "pack:mac": "electron-builder --mac zip --x64 --arm64",
     "pack:dir": "electron-builder --dir"
   },
   "dependencies": {
@@ -60,13 +62,15 @@
       "target": [
         "AppImage"
       ],
-      "category": "Graphics"
+      "category": "Graphics",
+      "artifactName": "Loopframe-${version}-${arch}.${ext}"
     },
     "mac": {
       "target": [
         "zip"
       ],
-      "category": "public.app-category.graphics-design"
+      "category": "public.app-category.graphics-design",
+      "artifactName": "Loopframe-${version}-${arch}-mac.${ext}"
     },
     "icon": "build/icon.png"
   }

@@ -55,10 +55,12 @@ Requirements:
 
 Install and start:
 
-```powershell
+```bash
 npm install
 npm start
 ```
+
+The same commands work in PowerShell, Terminal on macOS, and a Linux shell.
 
 The application stores non secret preferences in the current user's
 application data folder. Password storage is optional. When enabled, the
@@ -117,14 +119,21 @@ The completed live record is in
 
 ## Package
 
-Build a portable Windows executable:
+Build the package for the computer doing the build:
 
-```powershell
+```bash
 npm run pack:win
+npm run pack:linux
+npm run pack:mac
 ```
 
-The output is written to `dist`. The same source can be built on macOS and
-Linux with `electron-builder`.
+Choose the command for the host system. Windows builds a portable executable,
+Linux builds an AppImage, and macOS builds ZIP files for Intel and Apple
+Silicon.
+
+The output is written to `dist`. macOS packages should be signed and notarized
+before public distribution. See [docs/PLATFORMS.md](docs/PLATFORMS.md) for the
+full release matrix and user instructions.
 
 The application does not require an installer, a system service, or operating
 system administrator rights. Each user gets a separate settings folder.
