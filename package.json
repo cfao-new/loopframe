@@ -8,11 +8,11 @@
   "private": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/cfao/loopframe.git"
+    "url": "https://github.com/cfao-new/loopframe.git"
   },
-  "homepage": "https://github.com/cfao/loopframe",
+  "homepage": "https://github.com/cfao-new/loopframe",
   "bugs": {
-    "url": "https://github.com/cfao/loopframe/issues"
+    "url": "https://github.com/cfao-new/loopframe/issues"
   },
   "scripts": {
     "start": "electron .",
