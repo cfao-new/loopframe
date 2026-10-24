@@ -14,6 +14,10 @@ all three systems. Settings use the current user's application data folder.
 Windows uses Credential Manager protection, macOS uses Keychain, and Linux uses
 the desktop keyring when Electron reports it as available.
 
+The packaged application does not need a separate runtime, installer, system
+service, or administrator password. Linux AppImage users may extract and run
+the package without FUSE.
+
 ## Linux From Source
 
 Install Node.js 22 or newer with the package manager supplied by your Linux
@@ -71,6 +75,11 @@ The repository includes a GitHub Actions workflow that builds:
 
 The workflow runs the local tests before creating release packages. A live
 console test is separate because it changes real controller state.
+
+The interface test covers artwork loading, all six catalog sizes at the
+processor level, G6 Pro Entry and G4 Doorbell Pro preview shapes, both upload
+transports, opt in Protect credentials, mouse drag, rollback, and local data
+removal.
 
 ## No Admin Rule
 

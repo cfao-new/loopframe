@@ -1,0 +1,210 @@
+{
+  "catalogVersion": 2,
+  "retrievedAt": "2026-10-24",
+  "screenDevices": [
+    {
+      "id": "uvc-g4-doorbell-pro",
+      "name": "UniFi G4 Doorbell Pro",
+      "kind": "doorbell",
+      "application": "protect",
+      "artworkAspectRatio": 0.322,
+      "modelAliases": [
+        "UVC G4 Doorbell Pro",
+        "G4 Doorbell Pro"
+      ],
+      "screen": {
+        "width": 240,
+        "height": 240,
+        "nativeWidth": 240,
+        "nativeHeight": 240,
+        "orientation": "square",
+        "inches": null,
+        "luminanceNits": null,
+        "source": "community",
+        "confidence": "unverified",
+        "note": "UniFi confirms an integrated programmable welcome display but does not publish its resolution. A detected device value takes priority over this 240 by 240 community fallback."
+      },
+      "upload": {
+        "transport": "protect-lcd",
+        "status": "experimental",
+        "animated": "unverified",
+        "reason": "Uses the published Protect device asset and LCD image message flow. G4 Doorbell Pro hardware validation is still required before marking animation support verified."
+      },
+      "sourceUrl": "https://techspecs.ui.com/unifi/physical-security/uvc-g4-doorbell-pro"
+    },
+    {
+      "id": "uvc-g6-pro-entry",
+      "name": "UniFi G6 Pro Entry",
+      "kind": "doorbell",
+      "application": "access",
+      "artworkAspectRatio": 0.224,
+      "modelAliases": [
+        "UVC G6 Pro Entry",
+        "G6 Pro Entry"
+      ],
+      "screen": {
+        "width": 480,
+        "height": 854,
+        "nativeWidth": 480,
+        "nativeHeight": 854,
+        "orientation": "portrait",
+        "inches": 3,
+        "luminanceNits": 1000,
+        "source": "official",
+        "confidence": "verified",
+        "note": ""
+      },
+      "upload": {
+        "transport": "access-background",
+        "status": "verified",
+        "animated": "verified",
+        "reason": "Access background upload verified with real hardware.",
+        "requiredConfigKeys": [
+          "bg",
+          "bgs"
+        ]
+      },
+      "sourceUrl": "https://techspecs.ui.com/unifi/door-access/uvc-g6-pro-entry"
+    },
+    {
+      "id": "ua-g3-intercom",
+      "name": "UniFi Access G3 Intercom",
+      "kind": "intercom",
+      "application": "access",
+      "artworkAspectRatio": 0.35,
+      "modelAliases": [
+        "UA G3 Intercom",
+        "G3 Intercom"
+      ],
+      "screen": {
+        "width": 600,
+        "height": 1024,
+        "nativeWidth": 1024,
+        "nativeHeight": 600,
+        "orientation": "portrait",
+        "inches": 7,
+        "luminanceNits": 1000,
+        "source": "official",
+        "confidence": "verified",
+        "note": "UniFi publishes the native pixel array in landscape order and the screen orientation as portrait."
+      },
+      "upload": {
+        "transport": "access-background",
+        "status": "experimental",
+        "animated": "experimental",
+        "reason": "Uses the verified Access background route when this device exposes bg and bgs. This model has not completed a hardware upload run.",
+        "requiredConfigKeys": [
+          "bg",
+          "bgs"
+        ]
+      },
+      "sourceUrl": "https://techspecs.ui.com/unifi/door-access/ua-g3-intercom"
+    },
+    {
+      "id": "ua-intercom",
+      "name": "UniFi Access Intercom previous generation",
+      "kind": "intercom",
+      "application": "access",
+      "artworkAspectRatio": 0.35,
+      "modelAliases": [
+        "UA Intercom",
+        "UniFi Access Intercom",
+        "Access Intercom"
+      ],
+      "screen": {
+        "width": 600,
+        "height": 1024,
+        "nativeWidth": 1024,
+        "nativeHeight": 600,
+        "orientation": "portrait",
+        "inches": 7,
+        "luminanceNits": 1000,
+        "source": "official",
+        "confidence": "verified",
+        "note": "UniFi publishes the native pixel array in landscape order and the screen orientation as portrait."
+      },
+      "upload": {
+        "transport": "access-background",
+        "status": "experimental",
+        "animated": "experimental",
+        "reason": "Uses the verified Access background route when this device exposes bg and bgs. This model has not completed a hardware upload run.",
+        "requiredConfigKeys": [
+          "bg",
+          "bgs"
+        ]
+      },
+      "sourceUrl": "https://techspecs.ui.com/unifi/door-access/ua-intercom"
+    },
+    {
+      "id": "ua-intercom-viewer",
+      "name": "UniFi Access Intercom Viewer",
+      "kind": "viewer",
+      "application": "access",
+      "artworkAspectRatio": 0.533,
+      "modelAliases": [
+        "UA Intercom Viewer",
+        "Access Intercom Viewer",
+        "Access Display"
+      ],
+      "screen": {
+        "width": 720,
+        "height": 1280,
+        "nativeWidth": 1280,
+        "nativeHeight": 720,
+        "orientation": "portrait",
+        "inches": 5,
+        "luminanceNits": 300,
+        "source": "official",
+        "confidence": "verified",
+        "note": "UniFi publishes the native pixel array in landscape order and the screen orientation as portrait."
+      },
+      "upload": {
+        "transport": "access-background",
+        "status": "experimental",
+        "animated": "experimental",
+        "reason": "Uses the verified Access background route when this device exposes bg and bgs. This model has not completed a hardware upload run.",
+        "requiredConfigKeys": [
+          "bg",
+          "bgs"
+        ]
+      },
+      "sourceUrl": "https://techspecs.ui.com/unifi/door-access/ua-intercom-viewer"
+    },
+    {
+      "id": "ua-g2-pro",
+      "name": "UniFi Access G2 Reader Pro",
+      "kind": "reader",
+      "application": "access",
+      "artworkAspectRatio": 0.3,
+      "modelAliases": [
+        "UA G2 Pro",
+        "UA-G2-Pro",
+        "G2 Reader Pro",
+        "G2 Pro"
+      ],
+      "screen": {
+        "width": 286,
+        "height": 1280,
+        "nativeWidth": 1280,
+        "nativeHeight": 286,
+        "orientation": "portrait",
+        "inches": 4.7,
+        "luminanceNits": 480,
+        "source": "official",
+        "confidence": "verified",
+        "note": "UniFi publishes the native pixel array in landscape order and the screen orientation as portrait."
+      },
+      "upload": {
+        "transport": "access-background",
+        "status": "experimental",
+        "animated": "experimental",
+        "reason": "Preview remains available when detected. Publishing is enabled only if the device exposes bg and bgs, and this model has not completed a hardware upload run.",
+        "requiredConfigKeys": [
+          "bg",
+          "bgs"
+        ]
+      },
+      "sourceUrl": "https://techspecs.ui.com/unifi/door-access/ua-g2-pro"
+    }
+  ]
+}

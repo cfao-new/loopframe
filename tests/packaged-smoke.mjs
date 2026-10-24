@@ -7,7 +7,9 @@ import { _electron as electron } from "playwright";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
-const executablePath = path.join(projectRoot, "dist", "win-unpacked", "Loopframe.exe");
+const executablePath =
+  process.env.LOOPFRAME_PACKAGED_EXECUTABLE ||
+  path.join(projectRoot, "dist", "win-unpacked", "Loopframe.exe");
 const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "loopframe-packaged-"));
 let electronApp;
 
@@ -27,6 +29,10 @@ try {
     if (message.type() === "error") errors.push(message.text());
   });
   await page.locator("#setup-form").waitFor();
+  await page.locator("#fit-grid .fit-option").first().waitFor({
+    state: "attached",
+    timeout: 15000,
+  });
   const fitCount = await page.locator("#fit-grid .fit-option").count();
   if (fitCount !== 6) {
     console.log(JSON.stringify({
@@ -36,16 +42,26 @@ try {
   }
   assert.equal(fitCount, 6);
   assert.equal(await page.locator("#template-grid .template-option").count(), 5);
-  assert.equal(await page.locator("#donation-link").isHidden(), true);
+  assert.equal(await page.locator("#experimental-screen-devices").isChecked(), false);
+  assert.equal(await page.locator("#protect-connection").isHidden(), true);
+  await page.locator("#donation-link").waitFor({ state: "visible" });
+  assert.equal(
+    await page.locator("#donation-link").getAttribute("href"),
+    "https://buymeacoffee.com/cfao",
+  );
   const meta = await page.evaluate(() => window.loopframe.getMeta());
+  const donation = await page.evaluate(() => window.loopframe.getDonation());
   assert.equal(meta.version, "1.0.0");
   assert.equal(meta.credentialVault, true);
+  assert.equal(donation.enabled, true);
+  assert.equal(donation.url, "https://buymeacoffee.com/cfao");
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({
     status: "passed",
     executable: path.basename(executablePath),
     version: meta.version,
     credentialVault: meta.credentialVault,
+    donation: donation.service,
   }, null, 2));
 } finally {
   if (electronApp) await electronApp.close();

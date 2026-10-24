@@ -58,10 +58,17 @@ test("connection removal deletes settings, secret, history, and rollback records
       previousBg: "old.png",
       previousBgs: "old.png",
     });
+    await store.saveProtectConnection({
+      host: "https://console.example",
+      username: "protect-user",
+      password: "protect-password",
+      rememberSignIn: true,
+    });
 
     const settings = await store.removeAll();
     assert.equal(settings.host, "");
     assert.equal(settings.passwordStored, false);
+    assert.equal(settings.protectPasswordStored, false);
     assert.deepEqual(await store.listHistory(), []);
     assert.deepEqual(await store.listBackups(), []);
   } finally {
@@ -78,6 +85,44 @@ test("rollback records are limited to the application backup directory", async (
       () => store.removeBackup(path.join(directory, "outside.json")),
       /Invalid backup path/,
     );
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
+test("experimental discovery and Protect credentials are persisted and removed", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "loopframe-settings-"));
+  try {
+    const store = new SettingsStore(directory, fakeSafeStorage());
+    await store.initialize();
+    await store.saveSettings({
+      host: "https://console.example",
+      username: "access-user",
+      password: "access-password",
+      rememberSignIn: true,
+    });
+    await store.setExperimentalScreenDevices(true);
+    await store.saveProtectConnection({
+      host: "https://console.example",
+      username: "protect-user",
+      password: "protect-password",
+      rememberSignIn: true,
+    });
+
+    const reloaded = new SettingsStore(directory, fakeSafeStorage());
+    await reloaded.initialize();
+    const settings = await reloaded.readSettings();
+    assert.equal(settings.experimentalScreenDevices, true);
+    assert.equal(settings.protectUsername, "protect-user");
+    assert.equal(settings.protectPasswordStored, true);
+    assert.equal(await reloaded.readProtectPassword(), "protect-password");
+
+    const removed = await reloaded.removeAll();
+    assert.equal(removed.experimentalScreenDevices, false);
+    assert.equal(removed.protectPasswordStored, false);
+    assert.equal(await reloaded.readProtectPassword(), "");
+    const raw = await reloaded.readJson(reloaded.settingsPath, {});
+    assert.deepEqual(raw, {});
   } finally {
     await fs.rm(directory, { recursive: true, force: true, maxRetries: 5 });
   }

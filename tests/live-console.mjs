@@ -14,6 +14,7 @@ sharp.cache(false);
 const require = createRequire(import.meta.url);
 const { FIT_MODES, TEMPLATES, processImage } = require("../src/image-processor.cjs");
 const { UniFiClient } = require("../src/unifi-client.cjs");
+const { ProtectClient } = require("../src/protect-client.cjs");
 const { GIFEncoder, applyPalette, quantize } = gifenc;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
@@ -123,6 +124,7 @@ const result = {
   matrixCases: 0,
   staticFormatCases: 0,
   rollbackChecks: 0,
+  experimentalDiscovery: null,
   fits: Object.keys(FIT_MODES),
   templates: Object.keys(TEMPLATES),
   failures: [],
@@ -156,26 +158,30 @@ async function setBackground(client, deviceId, background, backgrounds) {
 
 async function uploadCase(client, targetDevice, sourcePath, options, filename) {
   const preparedPath = path.join(temporaryDirectory, filename);
-  const processed = await processImage(sourcePath, options);
+  const processed = await processImage(sourcePath, {
+    ...options,
+    targetWidth: targetDevice.screen.width,
+    targetHeight: targetDevice.screen.height,
+  });
   await fs.writeFile(preparedPath, processed.buffer);
   const preparedBytes = await fs.readFile(preparedPath);
   assert.equal(sha256(preparedBytes), processed.digest);
-  assert.equal(processed.output.width, 225);
-  assert.equal(processed.output.height, 400);
+  assert.equal(processed.output.width, targetDevice.screen.width);
+  assert.equal(processed.output.height, targetDevice.screen.height);
   assert.equal(processed.options.fit, options.fit);
   assert.equal(processed.options.template, options.template);
 
-  const backup = await client.captureBackground(targetDevice.id);
-  const published = await client.publish(targetDevice.id, preparedPath, backup);
+  const backup = await client.captureBackground(targetDevice.deviceId);
+  const published = await client.publish(targetDevice.deviceId, preparedPath, backup);
   activeUploadPath = published.uploadedPath;
-  const active = await client.captureBackground(targetDevice.id);
+  const active = await client.captureBackground(targetDevice.deviceId);
   assert.equal(active.previousBg, published.uploadedPath);
   assert.ok((active.previousBgs || "").split(",").includes(published.uploadedPath));
 
-  const restored = await client.restore(targetDevice.id, backup, published.uploadedPath);
+  const restored = await client.restore(targetDevice.deviceId, backup, published.uploadedPath);
   assert.equal(restored, true);
   activeUploadPath = "";
-  const finalState = await client.captureBackground(targetDevice.id);
+  const finalState = await client.captureBackground(targetDevice.deviceId);
   assert.equal(finalState.previousBg, baseline.previousBg);
   assert.equal(finalState.previousBgs, baseline.previousBgs);
 
@@ -272,7 +278,18 @@ try {
   assert.ok(devices.length >= 1);
   device = devices.find((entry) => /G6 Pro Entry/i.test(`${entry.model} ${entry.type}`)) || devices[0];
   assert.equal(device.connected, true);
-  baseline = await testClient.captureBackground(device.id);
+  const experimentalDevices = await testClient.listDevices({ experimental: true });
+  assert.ok(experimentalDevices.some((entry) => entry.deviceId === device.deviceId));
+  await assert.rejects(
+    () => new ProtectClient(testClient).listDevices(),
+    (error) => error.status === 403,
+    "An Access only account must not gain Protect access",
+  );
+  result.experimentalDiscovery = {
+    accessOnlyProtectDenied: true,
+    detectedAccessScreenDevices: experimentalDevices.length,
+  };
+  baseline = await testClient.captureBackground(device.deviceId);
   assert.ok(baseline.previousBg);
 
   for (const pathname of [
@@ -327,7 +344,7 @@ try {
     console.log(`live static ${result.staticFormatCases}/${formats.length}: ${format}`);
   }
 
-  const finalState = await testClient.captureBackground(device.id);
+  const finalState = await testClient.captureBackground(device.deviceId);
   assert.equal(finalState.previousBg, baseline.previousBg);
   assert.equal(finalState.previousBgs, baseline.previousBgs);
   result.status = "passed";
@@ -339,11 +356,11 @@ try {
   if (testClient && device && baseline) {
     try {
       if (activeUploadPath) {
-        await testClient.restore(device.id, baseline, activeUploadPath);
+        await testClient.restore(device.deviceId, baseline, activeUploadPath);
       } else {
-        await setBackground(testClient, device.id, baseline.previousBg, baseline.previousBgs);
+        await setBackground(testClient, device.deviceId, baseline.previousBg, baseline.previousBgs);
       }
-      const restored = await testClient.captureBackground(device.id);
+      const restored = await testClient.captureBackground(device.deviceId);
       result.restoredExactBaseline =
         restored.previousBg === baseline.previousBg &&
         restored.previousBgs === baseline.previousBgs;

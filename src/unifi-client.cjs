@@ -4,6 +4,7 @@ const http = require("node:http");
 const path = require("node:path");
 const { URL } = require("node:url");
 const FormData = require("form-data");
+const { findScreenDevice, screenForDevice } = require("./device-catalog.cjs");
 
 function normalizeConsoleAddress(value) {
   const text = String(value || "").trim();
@@ -128,7 +129,17 @@ function collectDevices(node, devices = []) {
   if (typeof node !== "object") return devices;
   const configKeys = (node.configs || []).map((entry) => entry.key);
   const hasBackgroundControls = configKeys.includes("bg") && configKeys.includes("bgs");
-  if (node.unique_id && (node.is_camera === true || hasBackgroundControls)) {
+  const hasCatalogScreen = Boolean(findScreenDevice(node));
+  const hasDetectedScreen = Boolean(screenFromValue(node));
+  if (
+    node.unique_id &&
+    (
+      node.is_camera === true ||
+      hasBackgroundControls ||
+      hasCatalogScreen ||
+      hasDetectedScreen
+    )
+  ) {
     devices.push(node);
   }
   for (const value of Object.values(node)) collectDevices(value, devices);
@@ -140,15 +151,119 @@ function configValue(device, key) {
   return item ? item.value : null;
 }
 
+function screenFromValue(value, depth = 0) {
+  if (!value || depth > 5) return null;
+  if (typeof value === "string") {
+    const match = value.match(/\b(\d{3,4})\s*[x×]\s*(\d{3,4})\b/i);
+    return match
+      ? { width: Number(match[1]), height: Number(match[2]), source: "device" }
+      : null;
+  }
+  if (typeof value !== "object") return null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = screenFromValue(item, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const widthKey = Object.keys(value).find((key) =>
+    /^(screen|display).*width$/i.test(key),
+  );
+  const heightKey = Object.keys(value).find((key) =>
+    /^(screen|display).*height$/i.test(key),
+  );
+  if (widthKey && heightKey) {
+    const width = Number(value[widthKey]);
+    const height = Number(value[heightKey]);
+    if (width >= 32 && height >= 32) {
+      return { width, height, source: "device" };
+    }
+  }
+  if (value.screen && typeof value.screen === "object") {
+    const width = Number(value.screen.width);
+    const height = Number(value.screen.height);
+    if (width >= 32 && height >= 32) {
+      return { width, height, source: "device" };
+    }
+  }
+
+  for (const [key, child] of Object.entries(value)) {
+    if (/camera|video/i.test(key)) continue;
+    if (/screen|display/i.test(key)) {
+      const found = screenFromValue(child, depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function knownScreen(device) {
+  return screenForDevice(device);
+}
+
+function artworkUrlFor(device) {
+  const images = device?.images;
+  if (!images || typeof images !== "object") return "";
+  for (const size of ["xxl", "xl", "l", "m", "s", "xs"]) {
+    const value = images[size];
+    if (typeof value === "string" && /^https?:\/\//i.test(value)) return value;
+  }
+  return "";
+}
+
+function highResolutionArtworkUrl(value) {
+  if (typeof value !== "string" || !/^https?:\/\//i.test(value)) return "";
+  return value.replace(/_(\d+)x(\d+)(\.(?:png|jpe?g|webp))$/i, "_512x512$3");
+}
+
+function artworkUrlsFor(device) {
+  const images = device?.images;
+  if (!images || typeof images !== "object") return [];
+  const original = ["xxl", "xl", "l", "m", "s", "xs"]
+    .map((size) => images[size])
+    .find((value) => typeof value === "string" && /^https?:\/\//i.test(value)) || "";
+  const highResolution = highResolutionArtworkUrl(original);
+  return [...new Set([highResolution, original].filter(Boolean))];
+}
+
+function accessUploadFor(entry, device) {
+  const configKeys = new Set((device?.configs || []).map((item) => item.key));
+  const required = entry?.upload?.requiredConfigKeys || [];
+  const hasRequiredControls = required.every((key) => configKeys.has(key));
+  if (!entry || !hasRequiredControls) {
+    return {
+      transport: "access-background",
+      status: "unsupported",
+      animated: "unsupported",
+      reason: "This detected screen does not expose the Access background controls, so Loopframe can preview it but cannot publish it.",
+    };
+  }
+  return { ...entry.upload };
+}
+
 function publicDevice(device) {
+  const detectedScreen = screenFromValue(device);
+  const entry = findScreenDevice(device);
+  const screen = screenForDevice(device, detectedScreen);
+  const artworkUrls = artworkUrlsFor(device);
   return {
-    id: device.unique_id,
+    id: `access:${device.unique_id}`,
+    deviceId: device.unique_id,
+    sourceApp: "access",
     name: device.name || device.alias || device.device_type || "Access device",
     type: device.device_type || "",
     model: device.model || device.model_name || "",
     firmware: device.firmware || device.firmware_version || "",
     connected: Boolean(device.is_connected),
     hasBackground: Boolean(configValue(device, "bg")),
+    screen,
+    catalogId: entry?.id || null,
+    artworkAspectRatio: entry?.artworkAspectRatio || 0.35,
+    upload: accessUploadFor(entry, device),
+    artworkUrl: artworkUrls[0] || artworkUrlFor(device),
+    artworkFallbackUrl: artworkUrls[1] || "",
   };
 }
 
@@ -228,9 +343,55 @@ class UniFiClient {
     return collectDevices(body?.data);
   }
 
-  async listDevices() {
+  async listDevices(options = {}) {
     const devices = await this.getTopology();
-    return devices.map(publicDevice);
+    return devices
+      .map(publicDevice)
+      .filter((device) =>
+        device.screen &&
+        (options.experimental ||
+          (device.hasBackground && device.upload?.status === "verified")),
+      );
+  }
+
+  async getDeviceArtwork(value) {
+    let target;
+    try {
+      target = new URL(value, this.origin);
+    } catch {
+      throw new Error("The device artwork address is invalid.");
+    }
+    const trustedStaticHost =
+      target.protocol === "https:" &&
+      target.hostname === "static.ui.com" &&
+      target.pathname.startsWith("/fingerprint/ui/");
+    const trustedConsole = target.origin === this.origin;
+    if (!trustedStaticHost && !trustedConsole) {
+      throw new Error("The device artwork address is not from UniFi.");
+    }
+
+    const response = await requestRaw(
+      target.origin,
+      `${target.pathname}${target.search}`,
+      {
+        timeout: 15000,
+        headers: trustedConsole ? this.headers() : {},
+      },
+    );
+    if (!response.ok) {
+      throw new Error(`Device artwork download failed with HTTP ${response.status}.`);
+    }
+    const contentType = String(response.headers["content-type"] || "").split(";")[0].trim();
+    if (!/^image\/(?:png|jpe?g|webp|gif)$/i.test(contentType)) {
+      throw new Error("The console returned an invalid device artwork file.");
+    }
+    if (!response.body.length || response.body.length > 2 * 1024 * 1024) {
+      throw new Error("The device artwork file is empty or too large.");
+    }
+    return {
+      dataUrl: `data:${contentType};base64,${response.body.toString("base64")}`,
+      bytes: response.body.length,
+    };
   }
 
   async findDevice(deviceId) {
@@ -320,6 +481,13 @@ class UniFiClient {
 module.exports = {
   UniFiClient,
   normalizeConsoleAddress,
+  requestRaw,
+  requestMultipart,
   collectDevices,
   configValue,
+  screenFromValue,
+  knownScreen,
+  artworkUrlFor,
+  artworkUrlsFor,
+  highResolutionArtworkUrl,
 };

@@ -74,24 +74,31 @@ function normalizeOptions(options = {}) {
     offsetX: clamp(Number(options.offsetX) || 0, -100, 100),
     offsetY: clamp(Number(options.offsetY) || 0, -100, 100),
     background: normalizedColor(options.background),
+    targetWidth: clamp(Math.round(Number(options.targetWidth) || TARGET_WIDTH), 32, 4096),
+    targetHeight: clamp(Math.round(Number(options.targetHeight) || TARGET_HEIGHT), 32, 4096),
   };
 }
 
 function baseDimensions(sourceWidth, sourceHeight, options) {
   const zoom = options.zoom / 100;
+  const targetWidth = options.targetWidth;
+  const targetHeight = options.targetHeight;
   if (options.fit === "stretch") {
-    return { width: TARGET_WIDTH, height: TARGET_HEIGHT };
+    return {
+      width: Math.max(1, Math.round(targetWidth * zoom)),
+      height: Math.max(1, Math.round(targetHeight * zoom)),
+    };
   }
 
   let scale;
   if (options.fit === "fill") {
-    scale = Math.max(TARGET_WIDTH / sourceWidth, TARGET_HEIGHT / sourceHeight);
+    scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight);
   } else if (options.fit === "contain") {
-    scale = Math.min(TARGET_WIDTH / sourceWidth, TARGET_HEIGHT / sourceHeight);
+    scale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight);
   } else if (options.fit === "width") {
-    scale = TARGET_WIDTH / sourceWidth;
+    scale = targetWidth / sourceWidth;
   } else if (options.fit === "height") {
-    scale = TARGET_HEIGHT / sourceHeight;
+    scale = targetHeight / sourceHeight;
   } else {
     scale = 1;
   }
@@ -107,7 +114,7 @@ function placementFor(size, targetSize, position) {
     const range = size - targetSize;
     const midpoint = range / 2;
     return {
-      crop: clamp(Math.round(midpoint * (1 + position / 100)), 0, range),
+      crop: clamp(Math.round(midpoint * (1 - position / 100)), 0, range),
       padBefore: 0,
       padAfter: 0,
     };
@@ -127,8 +134,17 @@ function backgroundColor(value) {
   };
 }
 
-function frameIntoCanvas(sourceFrame, sourceWidth, sourceHeight, horizontal, vertical, background) {
-  const target = Buffer.alloc(TARGET_WIDTH * TARGET_HEIGHT * 4);
+function frameIntoCanvas(
+  sourceFrame,
+  sourceWidth,
+  sourceHeight,
+  horizontal,
+  vertical,
+  background,
+  targetWidth,
+  targetHeight,
+) {
+  const target = Buffer.alloc(targetWidth * targetHeight * 4);
   for (let index = 0; index < target.length; index += 4) {
     target[index] = background.r;
     target[index + 1] = background.g;
@@ -136,17 +152,17 @@ function frameIntoCanvas(sourceFrame, sourceWidth, sourceHeight, horizontal, ver
     target[index + 3] = 255;
   }
 
-  const sourceX = sourceWidth > TARGET_WIDTH ? horizontal.crop : 0;
-  const sourceY = sourceHeight > TARGET_HEIGHT ? vertical.crop : 0;
-  const destinationX = sourceWidth < TARGET_WIDTH ? horizontal.padBefore : 0;
-  const destinationY = sourceHeight < TARGET_HEIGHT ? vertical.padBefore : 0;
-  const copyWidth = Math.min(sourceWidth, TARGET_WIDTH);
-  const copyHeight = Math.min(sourceHeight, TARGET_HEIGHT);
+  const sourceX = sourceWidth > targetWidth ? horizontal.crop : 0;
+  const sourceY = sourceHeight > targetHeight ? vertical.crop : 0;
+  const destinationX = sourceWidth < targetWidth ? horizontal.padBefore : 0;
+  const destinationY = sourceHeight < targetHeight ? vertical.padBefore : 0;
+  const copyWidth = Math.min(sourceWidth, targetWidth);
+  const copyHeight = Math.min(sourceHeight, targetHeight);
 
   for (let y = 0; y < copyHeight; y += 1) {
     for (let x = 0; x < copyWidth; x += 1) {
       const sourceIndex = ((sourceY + y) * sourceWidth + sourceX + x) * 4;
-      const targetIndex = ((destinationY + y) * TARGET_WIDTH + destinationX + x) * 4;
+      const targetIndex = ((destinationY + y) * targetWidth + destinationX + x) * 4;
       const alpha = sourceFrame[sourceIndex + 3] / 255;
       if (alpha >= 1) {
         target[targetIndex] = sourceFrame[sourceIndex];
@@ -164,8 +180,8 @@ function frameIntoCanvas(sourceFrame, sourceWidth, sourceHeight, horizontal, ver
   return target;
 }
 
-function overlaySvg(template) {
-  const opening = `<svg width="${TARGET_WIDTH}" height="${TARGET_HEIGHT}" xmlns="http://www.w3.org/2000/svg">`;
+function overlaySvg(template, targetWidth, targetHeight) {
+  const opening = `<svg width="${targetWidth}" height="${targetHeight}" xmlns="http://www.w3.org/2000/svg">`;
   const closing = "</svg>";
   if (template === "soft-bottom") {
     return Buffer.from(`${opening}
@@ -175,7 +191,7 @@ function overlaySvg(template) {
           <stop offset="1" stop-color="#000000" stop-opacity="0.72"/>
         </linearGradient>
       </defs>
-      <rect width="225" height="400" fill="url(#g)"/>
+      <rect width="${targetWidth}" height="${targetHeight}" fill="url(#g)"/>
     ${closing}`);
   }
   if (template === "soft-top") {
@@ -186,7 +202,7 @@ function overlaySvg(template) {
           <stop offset="0.46" stop-color="#000000" stop-opacity="0"/>
         </linearGradient>
       </defs>
-      <rect width="225" height="400" fill="url(#g)"/>
+      <rect width="${targetWidth}" height="${targetHeight}" fill="url(#g)"/>
     ${closing}`);
   }
   if (template === "vignette") {
@@ -197,15 +213,17 @@ function overlaySvg(template) {
           <stop offset="1" stop-color="#000000" stop-opacity="0.58"/>
         </radialGradient>
       </defs>
-      <rect width="225" height="400" fill="url(#g)"/>
+      <rect width="${targetWidth}" height="${targetHeight}" fill="url(#g)"/>
     ${closing}`);
   }
   if (template === "focus-frame") {
     return Buffer.from(`${opening}
-      <rect x="10.5" y="10.5" width="204" height="379" rx="18"
+      <rect x="${targetWidth * 0.047}" y="${targetHeight * 0.026}" width="${targetWidth * 0.907}" height="${targetHeight * 0.948}" rx="${Math.min(targetWidth, targetHeight) * 0.045}"
         fill="none" stroke="#ffffff" stroke-opacity="0.38" stroke-width="1.5"/>
-      <path d="M22 42V28a6 6 0 0 1 6-6h14 M183 22h14a6 6 0 0 1 6 6v14
-        M203 358v14a6 6 0 0 1-6 6h-14 M42 378H28a6 6 0 0 1-6-6v-14"
+      <path d="M${targetWidth * 0.098} ${targetHeight * 0.105}V${targetHeight * 0.07}a${targetWidth * 0.027} ${targetWidth * 0.027} 0 0 1 ${targetWidth * 0.027}-${targetWidth * 0.027}h${targetWidth * 0.062}
+        M${targetWidth * 0.813} ${targetHeight * 0.055}h${targetWidth * 0.062}a${targetWidth * 0.027} ${targetWidth * 0.027} 0 0 1 ${targetWidth * 0.027} ${targetWidth * 0.027}v${targetHeight * 0.035}
+        M${targetWidth * 0.902} ${targetHeight * 0.895}v${targetHeight * 0.035}a${targetWidth * 0.027} ${targetWidth * 0.027} 0 0 1-${targetWidth * 0.027} ${targetWidth * 0.027}h-${targetWidth * 0.062}
+        M${targetWidth * 0.187} ${targetHeight * 0.945}H${targetWidth * 0.124}a${targetWidth * 0.027} ${targetWidth * 0.027} 0 0 1-${targetWidth * 0.027}-${targetWidth * 0.027}v-${targetHeight * 0.035}"
         fill="none" stroke="#ffffff" stroke-opacity="0.76" stroke-width="2"
         stroke-linecap="round"/>
     ${closing}`);
@@ -226,13 +244,13 @@ function blendOverlay(frame, overlay, pageOffset) {
   }
 }
 
-async function encodeAnimatedGif(raw, pageSize, pages, delays, repeat) {
+async function encodeAnimatedGif(raw, pageSize, pages, delays, repeat, width, height) {
   const encoder = GIFEncoder();
   for (let page = 0; page < pages; page += 1) {
     const frame = Buffer.from(raw.subarray(page * pageSize, (page + 1) * pageSize));
     const palette = quantize(frame, 256, { format: "rgb565" });
     const indexed = applyPalette(frame, palette, "rgb565");
-    encoder.writeFrame(indexed, TARGET_WIDTH, TARGET_HEIGHT, {
+    encoder.writeFrame(indexed, width, height, {
       palette,
       delay: delays[page] || 80,
       repeat: page === 0 ? repeat : undefined,
@@ -255,27 +273,33 @@ async function sourceMetadata(inputPath) {
   };
 }
 
-async function framePreview(buffer) {
-  const preview = await sharp(buffer, { page: 0, pages: 1 })
-    .resize(450, 800, { fit: "fill" })
-    .png()
-    .toBuffer();
-  return `data:image/png;base64,${preview.toString("base64")}`;
+async function inspectImage(inputPath) {
+  const metadata = await sourceMetadata(inputPath);
+  const delays = metadata.delay || [];
+  return {
+    width: metadata.width,
+    height: metadata.height,
+    frames: metadata.pages || 1,
+    durationMs: delays.reduce((total, value) => total + value, 0),
+    format: metadata.format,
+  };
+}
+
+function animatedPreview(buffer) {
+  return `data:image/gif;base64,${buffer.toString("base64")}`;
 }
 
 async function processImage(inputPath, rawOptions = {}) {
   const options = normalizeOptions(rawOptions);
+  const targetWidth = options.targetWidth;
+  const targetHeight = options.targetHeight;
   const metadata = await sourceMetadata(inputPath);
   const dimensions = baseDimensions(metadata.width, metadata.height, options);
-  const horizontal = placementFor(dimensions.width, TARGET_WIDTH, options.offsetX);
-  const vertical = placementFor(dimensions.height, TARGET_HEIGHT, options.offsetY);
+  const horizontal = placementFor(dimensions.width, targetWidth, options.offsetX);
+  const vertical = placementFor(dimensions.height, targetHeight, options.offsetY);
 
   let image = sharp(inputPath, { animated: true });
-  if (options.fit === "stretch") {
-    image = image.resize(TARGET_WIDTH, TARGET_HEIGHT, { fit: "fill" });
-  } else {
-    image = image.resize(dimensions.width, dimensions.height, { fit: "fill" });
-  }
+  image = image.resize(dimensions.width, dimensions.height, { fit: "fill" });
 
   const { data: raw, info } = await image
     .ensureAlpha()
@@ -284,7 +308,7 @@ async function processImage(inputPath, rawOptions = {}) {
 
   const pages = info.pages || metadata.pages || 1;
   const sourcePageSize = dimensions.width * dimensions.height * 4;
-  const pageSize = TARGET_WIDTH * TARGET_HEIGHT * 4;
+  const pageSize = targetWidth * targetHeight * 4;
   const canvas = Buffer.alloc(pageSize * pages);
   const background = backgroundColor(options.background);
   for (let page = 0; page < pages; page += 1) {
@@ -296,11 +320,13 @@ async function processImage(inputPath, rawOptions = {}) {
       horizontal,
       vertical,
       background,
+      targetWidth,
+      targetHeight,
     );
     frame.copy(canvas, page * pageSize);
   }
 
-  const svg = overlaySvg(options.template);
+  const svg = overlaySvg(options.template, targetWidth, targetHeight);
   if (svg) {
     const overlay = await sharp(svg).ensureAlpha().raw().toBuffer();
     for (let page = 0; page < pages; page += 1) {
@@ -310,9 +336,17 @@ async function processImage(inputPath, rawOptions = {}) {
   }
   const sourceDelays = metadata.delay || [];
   const delays = Array.from({ length: pages }, (_, index) => sourceDelays[index] || 80);
-  const data = await encodeAnimatedGif(canvas, pageSize, pages, delays, metadata.loop ?? 0);
+  const data = await encodeAnimatedGif(
+    canvas,
+    pageSize,
+    pages,
+    delays,
+    metadata.loop ?? 0,
+    targetWidth,
+    targetHeight,
+  );
   const digest = crypto.createHash("sha256").update(data).digest("hex");
-  const preview = await framePreview(data);
+  const preview = animatedPreview(data);
 
   return {
     buffer: data,
@@ -326,8 +360,8 @@ async function processImage(inputPath, rawOptions = {}) {
       format: metadata.format,
     },
     output: {
-      width: TARGET_WIDTH,
-      height: TARGET_HEIGHT,
+      width: targetWidth,
+      height: targetHeight,
       pages,
       bytes: data.length,
       durationMs: delays.reduce((total, value) => total + value, 0),
@@ -352,6 +386,7 @@ module.exports = {
   TARGET_WIDTH,
   TARGET_HEIGHT,
   normalizeOptions,
+  inspectImage,
   processImage,
   writeProcessedImage,
 };

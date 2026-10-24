@@ -1,8 +1,8 @@
 {
-  "enabled": false,
-  "service": "Ko-fi",
+  "enabled": true,
+  "service": "Buy Me a Coffee",
   "label": "Support this project",
-  "url": "",
+  "url": "https://buymeacoffee.com/cfao",
   "placement": "footer",
   "promptOnLaunch": false
 }

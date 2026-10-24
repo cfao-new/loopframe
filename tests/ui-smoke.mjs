@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { _electron as electron } from "playwright";
 import gifenc from "gifenc";
+import sharp from "sharp";
 
 const { GIFEncoder, applyPalette, quantize } = gifenc;
 
@@ -50,6 +51,15 @@ async function createMockConsole() {
   const events = [];
   let currentBg = "backgrounds/original.png";
   let currentBgs = "backgrounds/original.png";
+  let currentProtectLcd = {};
+  let origin;
+  const mockArtwork = await sharp(Buffer.from(`
+    <svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+      <rect x="210" y="44" width="92" height="424" rx="18" fill="#1b221e"/>
+      <rect x="219" y="80" width="74" height="226" rx="8" fill="#0d1210"/>
+      <circle cx="256" cy="365" r="28" fill="none" stroke="#2b9cff" stroke-width="6"/>
+    </svg>
+  `)).png().toBuffer();
   const server = http.createServer(async (request, response) => {
     const chunks = [];
     for await (const chunk of request) chunks.push(chunk);
@@ -63,12 +73,14 @@ async function createMockConsole() {
     };
 
     if (url.pathname === "/api/auth/login" && request.method === "POST") {
+      const credentials = JSON.parse(body.toString("utf8"));
+      const token = credentials.username === "protect-test" ? "protect-token" : "test-token";
       send(200, {
         unique_id: "session-user",
         full_name: "Loopframe Test",
-        username: "loopframe-test",
+        username: credentials.username,
       }, {
-        "Set-Cookie": "TOKEN=test-token; Path=/",
+        "Set-Cookie": `TOKEN=${token}; Path=/`,
         "X-CSRF-Token": "test-csrf",
       });
       return;
@@ -96,8 +108,75 @@ async function createMockConsole() {
             { key: "bg", value: currentBg },
             { key: "bgs", value: currentBgs },
           ],
+          images: {
+            l: `${origin}/device-artwork.png`,
+            xxl: `${origin}/device-artwork.png`,
+          },
         }],
       });
+      return;
+    }
+    if (url.pathname === "/proxy/protect/api/bootstrap") {
+      if (!request.headers.cookie?.includes("TOKEN=protect-token")) {
+        send(403, { message: "Protect permission required" });
+        return;
+      }
+      send(200, {
+        cameras: [
+          {
+            id: "doorbell-1",
+            name: "Front door",
+            type: "UVC G6 Pro Entry",
+            marketName: "G6 Pro Entry",
+            state: "CONNECTED",
+            featureFlags: { hasLcdScreen: true, hasColorLcdScreen: true },
+            lcdMessage: {},
+          },
+          {
+            id: "g4-pro",
+            name: "Protect doorbell",
+            type: "UVC G4 Doorbell Pro",
+            marketName: "G4 Doorbell Pro",
+            state: "CONNECTED",
+            featureFlags: { hasLcdScreen: true, hasColorLcdScreen: true },
+            lcdMessage: {},
+            images: {
+              xxl: `${origin}/device-artwork.png`,
+            },
+          },
+          {
+            id: "g2-pro",
+            name: "Office reader",
+            type: "UA-G2-Pro",
+            marketName: "G2 Reader Pro",
+            state: "CONNECTED",
+            featureFlags: { hasLcdScreen: true, hasColorLcdScreen: true },
+            lcdMessage: {},
+          },
+          {
+            id: "g4-instant",
+            name: "Garden camera",
+            type: "UVC G4 Instant",
+            marketName: "G4 Instant",
+            state: "CONNECTED",
+            featureFlags: { hasLcdScreen: false, hasColorLcdScreen: false },
+          },
+          {
+            id: "preview-only-screen",
+            name: "Preview only panel",
+            type: "UVC Unknown Panel",
+            marketName: "Unknown Panel",
+            state: "CONNECTED",
+            screen: { width: 320, height: 480 },
+            featureFlags: { hasLcdScreen: true, hasColorLcdScreen: true },
+          },
+        ],
+      });
+      return;
+    }
+    if (url.pathname === "/device-artwork.png") {
+      response.writeHead(200, { "Content-Type": "image/png" });
+      response.end(mockArtwork);
       return;
     }
     if (url.pathname === "/proxy/access/api/v2/device/doorbell-1/resources") {
@@ -118,27 +197,47 @@ async function createMockConsole() {
       send(200, { code: 1 });
       return;
     }
+    if (url.pathname === "/proxy/protect/api/cameras/g4-pro" && request.method === "GET") {
+      send(200, { id: "g4-pro", name: "Protect doorbell", lcdMessage: currentProtectLcd });
+      return;
+    }
+    if (url.pathname === "/proxy/protect/api/cameras/g4-pro" && request.method === "PATCH") {
+      currentProtectLcd = JSON.parse(body.toString("utf8")).lcdMessage;
+      send(200, { id: "g4-pro", lcdMessage: currentProtectLcd });
+      return;
+    }
+    if (url.pathname === "/proxy/protect/api/files/animations" && request.method === "POST") {
+      send(200, {
+        name: "welcome.gif",
+        type: "animations",
+        path: "/data/animations/welcome.gif",
+      });
+      return;
+    }
     send(404, { code: 0, msg: "not found" });
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
+  origin = `http://127.0.0.1:${address.port}`;
   return {
-    origin: `http://127.0.0.1:${address.port}`,
+    origin,
     events,
     close: () => new Promise((resolve) => server.close(resolve)),
   };
 }
 
-async function waitForRender(page) {
+async function waitForPreview(page) {
   await page.waitForFunction(
     () => {
-      const ready = document.querySelector("#preview-status")?.textContent.includes("Ready to review");
-      const digest = document.querySelector("#preview-digest")?.textContent || "";
-      return ready && digest.startsWith("SHA-256");
+      const preview = document.querySelector("#output-preview");
+      return preview &&
+        !preview.hidden &&
+        preview.complete &&
+        preview.naturalWidth > 0 &&
+        document.querySelector("#preview-status")?.textContent.includes("Live preview");
     },
     { timeout: 20000 },
   );
-  return page.locator("#preview-digest").textContent();
 }
 
 async function overflow(page) {
@@ -162,7 +261,7 @@ await createSourceGif();
 await fs.mkdir(screenshotDirectory, { recursive: true });
 await fs.writeFile(donationPath, JSON.stringify({
   enabled: true,
-  service: "Ko-fi",
+  service: "Buy Me a Coffee",
   label: "Support this project",
   url: "https://example.com/support",
   placement: "footer",
@@ -219,51 +318,215 @@ try {
   await page.locator("#find-devices").click();
   await page.locator(".device-option").waitFor();
   assert.equal(await page.locator(".device-option").count(), 1);
+  assert.match(await page.locator(".device-option").innerText(), /480 x 854/);
+  assert.equal(
+    mock.events.some((event) => event.path === "/proxy/protect/api/bootstrap"),
+    false,
+  );
   await page.locator("#finish-setup").click();
   await page.locator("#studio-view.is-active").waitFor();
+  await page.locator("#selected-device-artwork").waitFor({ state: "visible" });
 
   const desktopOverflow = await overflow(page);
   assert.equal(desktopOverflow.overflow, false);
 
   await page.locator("#file-input").setInputFiles(sourcePath);
   await page.locator("#output-preview").waitFor({ state: "visible" });
-  let digest = await waitForRender(page);
+  await waitForPreview(page);
+  const screenAspect = await page.locator("#preview-screen").evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return bounds.width / bounds.height;
+  });
+  assert.ok(Math.abs(screenAspect - 480 / 854) < 0.01);
+  const completeImage = await page.evaluate(() => {
+    const screen = document.querySelector("#preview-screen").getBoundingClientRect();
+    const image = document.querySelector("#output-preview").getBoundingClientRect();
+    return {
+      left: image.left >= screen.left - 1,
+      right: image.right <= screen.right + 1,
+      top: image.top >= screen.top - 1,
+      bottom: image.bottom <= screen.bottom + 1,
+    };
+  });
+  assert.deepEqual(completeImage, {
+    left: true,
+    right: true,
+    top: true,
+    bottom: true,
+  });
+
+  const screenBox = await page.locator("#preview-screen").boundingBox();
+  const beforeDrag = await page.locator("#output-preview").evaluate((element) => ({
+    left: element.style.left,
+    top: element.style.top,
+  }));
+  await page.mouse.move(screenBox.x + screenBox.width / 2, screenBox.y + screenBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    screenBox.x + screenBox.width / 2 + 30,
+    screenBox.y + screenBox.height / 2 + 30,
+    { steps: 5 },
+  );
+  await page.mouse.up();
+  const afterContainDrag = await page.locator("#output-preview").evaluate((element) => ({
+    left: element.style.left,
+    top: element.style.top,
+  }));
+  assert.notEqual(afterContainDrag.left, beforeDrag.left);
+
   await page.locator('[data-fit="fill"]').click();
-  digest = await waitForRender(page);
+  await page.waitForTimeout(30);
+  const beforeVerticalDrag = await page.locator("#output-preview").evaluate((element) => element.style.top);
+  await page.mouse.move(screenBox.x + screenBox.width / 2, screenBox.y + screenBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    screenBox.x + screenBox.width / 2,
+    screenBox.y + screenBox.height / 2 + 24,
+    { steps: 4 },
+  );
+  await page.mouse.up();
+  const afterVerticalDrag = await page.locator("#output-preview").evaluate((element) => element.style.top);
+  assert.notEqual(afterVerticalDrag, beforeVerticalDrag);
+
   await page.locator('[data-template="soft-bottom"]').click();
-  digest = await waitForRender(page);
   await captureWindow(electronApp, path.join(screenshotDirectory, "studio.png"));
   assert.equal(await page.locator("#review-publish").isEnabled(), true);
+  assert.equal(await page.locator("#offset-x").count(), 0);
+  assert.equal(await page.locator("#offset-y").count(), 0);
 
-  for (const fit of ["contain", "width", "height", "original", "stretch"]) {
+  for (const fit of ["contain", "fill", "width", "height", "original", "stretch"]) {
+    await page.locator("#zoom").fill("165");
     await page.locator(`[data-fit="${fit}"]`).click();
-    digest = await waitForRender(page);
+    assert.equal(await page.locator("#zoom").inputValue(), "100");
+    assert.equal(await page.locator("#zoom-value").innerText(), "100%");
+    await page.locator(`[data-fit="${fit}"]`).click();
+    await page.waitForTimeout(25);
+    assert.equal(
+      await page.locator(`[data-fit="${fit}"]`).getAttribute("class"),
+      "fit-option is-selected",
+    );
   }
   for (const template of ["none", "soft-bottom", "soft-top", "vignette", "focus-frame"]) {
     await page.locator(`[data-template="${template}"]`).click();
-    digest = await waitForRender(page);
+    await page.waitForTimeout(25);
+    assert.equal(
+      await page.locator(`[data-template="${template}"]`).getAttribute("class"),
+      "template-option is-selected",
+    );
   }
 
   await page.locator("#zoom").fill("140");
-  digest = await waitForRender(page);
-  await page.locator("#offset-x").fill("-50");
-  digest = await waitForRender(page);
-  await page.locator("#offset-y").fill("35");
-  digest = await waitForRender(page);
   await page.locator("#background-color").fill("#23362c");
-  digest = await waitForRender(page);
   await page.locator("#center-image").click();
-  digest = await waitForRender(page);
+  await page.locator('[data-fit="contain"]').click();
+  await page.locator('[data-template="soft-bottom"]').click();
+  await page.locator("#zoom").fill("100");
 
   await page.locator("#review-publish").click();
-  await page.locator("#publish-dialog").waitFor({ state: "visible" });
+  await page.locator("#publish-dialog").waitFor({ state: "visible", timeout: 30000 });
+  const dialogMedia = await page.locator("#dialog-preview").evaluate(async (image) => {
+    if (!image.complete) {
+      await new Promise((resolve) => image.addEventListener("load", resolve, { once: true }));
+    }
+    return {
+      src: image.getAttribute("src"),
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    };
+  });
+  assert.match(dialogMedia.src, /^data:image\/gif;base64,/);
+  assert.equal(dialogMedia.width, 480);
+  assert.equal(dialogMedia.height, 854);
+  await captureWindow(electronApp, path.join(screenshotDirectory, "review.png"));
   await page.locator("#confirm-publish").click();
   await page.getByText("The GIF is active on the selected device.").waitFor();
 
   await page.locator('[data-view-target="settings"]').click();
   await page.locator("#settings-view.is-active").waitFor();
   await page.locator("#backup-list .backup-item").waitFor();
+  assert.equal(await page.locator("#experimental-screen-devices").isChecked(), false);
+  await page.waitForTimeout(250);
   await captureWindow(electronApp, path.join(screenshotDirectory, "settings.png"));
+  await page.locator("#backup-list [data-restore-index]").click();
+  await page.getByText("The previous background was restored.").waitFor();
+  await page.getByText("No pending rollback records.").waitFor();
+
+  await page.locator("#experimental-screen-devices").check();
+  await page.waitForFunction(() =>
+    document.querySelector("#protect-connection-status")?.textContent.includes("cannot read Protect")
+  );
+  assert.equal(
+    mock.events.some((event) => event.path === "/proxy/protect/api/bootstrap"),
+    true,
+  );
+  await page.locator("#protect-credentials").waitFor({ state: "visible" });
+  await page.locator("#protect-user").fill("protect-test");
+  await page.locator("#protect-password").fill("protect-password");
+  await page.locator("#protect-remember-signin").check();
+  await page.locator("#connect-protect").click();
+  await page.waitForFunction(() => document.querySelectorAll("#device-select option").length === 4);
+  await page.waitForFunction(() =>
+    document.querySelector("#protect-connection-status")?.textContent.includes("Protect discovery is available.")
+  );
+  await page.waitForTimeout(250);
+  await captureWindow(electronApp, path.join(screenshotDirectory, "settings-experimental.png"));
+  assert.equal(await page.evaluate(() =>
+    window.loopframe.getSettings().then((settings) => settings.experimentalScreenDevices)
+  ), true);
+  assert.equal(await page.evaluate(() =>
+    window.loopframe.getSettings().then((settings) => settings.protectPasswordStored)
+  ), true);
+
+  await page.locator('[data-view-target="studio"]').click();
+  await page.locator("#studio-view.is-active").waitFor();
+  await page.locator("#device-select").selectOption("protect:g2-pro");
+  await page.waitForTimeout(200);
+  assert.equal(await page.locator("#studio-device-artwork").isHidden(), true);
+  assert.equal(
+    await page.locator(".device-reference .device-art-fallback").isVisible(),
+    true,
+  );
+  const readerAspect = await page.locator("#preview-screen").evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return bounds.width / bounds.height;
+  });
+  assert.ok(Math.abs(readerAspect - 286 / 1280) < 0.01);
+  await page.locator("#device-select").selectOption("protect:preview-only-screen");
+  await page.waitForTimeout(200);
+  assert.equal(await page.locator("#review-publish").isDisabled(), true);
+  assert.match(await page.locator("#device-capability-copy").innerText(), /no supported.*upload path/i);
+  await page.locator("#device-select").selectOption("protect:g4-pro");
+  await page.waitForTimeout(250);
+  const squareAspect = await page.locator("#preview-screen").evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return bounds.width / bounds.height;
+  });
+  assert.ok(Math.abs(squareAspect - 1) < 0.01);
+  assert.match(await page.locator("#studio-device-spec").innerText(), /240 x 240/);
+  assert.match(await page.locator("#studio-device-spec").innerText(), /Unverified panel/);
+  assert.match(await page.locator("#studio-device-capability").innerText(), /Experimental upload/);
+  await page.locator("#studio-device-artwork").waitFor({ state: "visible" });
+  const cachedArtwork = await fs.readdir(path.join(userData, "artwork-cache"));
+  assert.ok(cachedArtwork.length >= 1);
+  await captureWindow(electronApp, path.join(screenshotDirectory, "studio-experimental.png"));
+
+  await page.locator("#review-publish").click();
+  await page.locator("#publish-dialog").waitFor({ state: "visible", timeout: 30000 });
+  const protectMedia = await page.locator("#dialog-preview").evaluate((image) => ({
+    width: image.naturalWidth,
+    height: image.naturalHeight,
+    src: image.getAttribute("src"),
+  }));
+  assert.equal(protectMedia.width, 240);
+  assert.equal(protectMedia.height, 240);
+  assert.match(protectMedia.src, /^data:image\/gif;base64,/);
+  assert.equal(await page.locator("#dialog-upload-status").innerText(), "Protect / Experimental upload");
+  await page.locator("#confirm-publish").click();
+  await page.getByText("The image was sent to the Protect welcome display.").waitFor();
+
+  await page.locator('[data-view-target="settings"]').click();
+  await page.locator("#settings-view.is-active").waitFor();
+  await page.locator("#backup-list .backup-item").waitFor();
   await page.locator("#backup-list [data-restore-index]").click();
   await page.getByText("The previous background was restored.").waitFor();
   await page.getByText("No pending rollback records.").waitFor();
@@ -275,6 +538,7 @@ try {
   assert.equal(mobileOverflow.overflow, false);
   await page.locator('[data-view-target="studio"]').click();
   await page.locator("#studio-view.is-active").waitFor();
+  await page.waitForTimeout(200);
   await captureWindow(electronApp, path.join(screenshotDirectory, "studio-mobile.png"));
 
   await page.setViewportSize({ width: 1200, height: 900 });
@@ -288,9 +552,16 @@ try {
   page.once("dialog", (dialog) => dialog.accept());
   await page.locator("#remove-all").click();
   await page.locator("#setup-view.is-active").waitFor();
+  const clearedSettings = await page.evaluate(() => window.loopframe.getSettings());
+  assert.equal(clearedSettings.experimentalScreenDevices, false);
+  assert.equal(clearedSettings.protectPasswordStored, false);
+  const cacheAfterRemoval = await fs.readdir(path.join(userData, "artwork-cache"));
+  assert.deepEqual(cacheAfterRemoval, []);
 
   assert.deepEqual(errors, []);
   assert.ok(mock.events.some((event) => event.method === "POST" && event.path.endsWith("/resources")));
+  assert.ok(mock.events.some((event) => event.method === "POST" && event.path.endsWith("/files/animations")));
+  assert.ok(mock.events.some((event) => event.method === "PATCH" && event.path.includes("/protect/api/cameras/g4-pro")));
   assert.ok(mock.events.some((event) => event.method === "DELETE"));
 
   console.log(JSON.stringify({

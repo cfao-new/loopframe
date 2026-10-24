@@ -4,6 +4,10 @@ Loopframe uses a single optional link in the footer. The link is hidden until
 a valid web address is configured. It never opens by itself and never asks for
 support during setup or publication.
 
+The current public support page is
+[`buymeacoffee.com/cfao`](https://buymeacoffee.com/cfao). The Portugal service
+comparison below explains the available alternatives and their tradeoffs.
+
 ## Recommendation
 
 Use **Ko-fi** as the shared donation service for these applications in

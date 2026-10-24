@@ -5,7 +5,13 @@ const crypto = require("node:crypto");
 const { pathToFileURL } = require("node:url");
 const { SettingsStore } = require("./settings-store.cjs");
 const { UniFiClient, normalizeConsoleAddress } = require("./unifi-client.cjs");
-const { processImage, FIT_MODES, TEMPLATES } = require("./image-processor.cjs");
+const { ProtectClient } = require("./protect-client.cjs");
+const {
+  inspectImage,
+  processImage,
+  FIT_MODES,
+  TEMPLATES,
+} = require("./image-processor.cjs");
 
 const isDevelopment = !app.isPackaged;
 const allowedImageExtensions = new Set([
@@ -22,7 +28,9 @@ const allowedImageExtensions = new Set([
 let mainWindow;
 let store;
 let activeClient;
+let activeProtectClient;
 let preparedDirectory;
+let artworkCacheDirectory;
 
 if (process.env.LOOPFRAME_USER_DATA) {
   app.setPath("userData", path.resolve(process.env.LOOPFRAME_USER_DATA));
@@ -70,17 +78,101 @@ async function readDonation() {
   }
 }
 
-async function connect(host, username, password) {
+function mergeDiscoveredDevices(accessDevices, protectDevices) {
+  const merged = [...accessDevices];
+  for (const device of protectDevices) {
+    const existing = merged.find((item) => item.deviceId === device.deviceId);
+    if (!existing) {
+      merged.push(device);
+    } else if (
+      existing.upload?.status === "unsupported" &&
+      device.upload?.status !== "unsupported"
+    ) {
+      merged[merged.indexOf(existing)] = device;
+    }
+  }
+  return merged;
+}
+
+async function accessDevicesFor(client, experimental) {
+  try {
+    return {
+      devices: await client.listDevices({ experimental }),
+      status: { state: "connected", message: "Access discovery is available." },
+    };
+  } catch (error) {
+    if (experimental && [401, 403].includes(error.status)) {
+      return {
+        devices: [],
+        status: {
+          state: "permission-required",
+          message: "This account cannot read Access devices.",
+        },
+      };
+    }
+    throw error;
+  }
+}
+
+async function protectDevicesFor(client) {
+  const protect = new ProtectClient(client);
+  const devices = await protect.listDevices();
+  activeProtectClient = protect;
+  return devices;
+}
+
+async function connect(host, username, password, options = {}) {
   const client = new UniFiClient(host);
   const profile = await client.login(username, password);
-  const devices = await client.listDevices();
-  if (!devices.length) {
-    throw new Error("No compatible Access doorbell or display was found.");
-  }
   activeClient = client;
+  activeProtectClient = null;
+  const experimental = Boolean(options.experimentalScreenDevices);
+  const access = await accessDevicesFor(client, experimental);
+  let protect = [];
+  let protectStatus = {
+    state: experimental ? "not-connected" : "disabled",
+    message: experimental
+      ? "Protect discovery has not been checked."
+      : "Experimental screen discovery is disabled.",
+  };
+  if (experimental) {
+    try {
+      protect = await protectDevicesFor(client);
+      protectStatus = {
+        state: "connected",
+        message: "Protect discovery is available with this account.",
+      };
+    } catch (error) {
+      try {
+        const settings = await store.readSettings();
+        const protectClient = await ensureProtectClient(settings);
+        protect = protectClient ? await protectClient.listDevices() : [];
+        protectStatus = {
+          state: "connected",
+          message: "Protect discovery is available.",
+        };
+      } catch (fallbackError) {
+        activeProtectClient = null;
+        protectStatus = {
+          state: [401, 403].includes(fallbackError.status)
+            ? "permission-required"
+            : "error",
+          message: [401, 403].includes(fallbackError.status)
+            ? "This account does not have Protect access. Add a Protect sign in in Settings."
+            : fallbackError.message,
+        };
+      }
+    }
+  }
+  const devices = mergeDiscoveredDevices(access.devices, protect);
+  if (!devices.length && access.status.state === "connected") {
+    throw new Error("No compatible Access or Protect screen device was found.");
+  }
   return {
     profile: profileSummary(profile),
     devices,
+    accessStatus: access.status,
+    protectStatus,
   };
 }
 
@@ -91,8 +183,113 @@ async function ensureClient() {
   if (!settings.host || !settings.username || !password) {
     throw new Error("Open setup and sign in to the console first.");
   }
-  await connect(settings.host, settings.username, password);
+  await connect(
+    settings.host,
+    settings.username,
+    password,
+    { experimentalScreenDevices: settings.experimentalScreenDevices },
+  );
   return activeClient;
+}
+
+async function ensureProtectClient(settings, { allowAccessSession = true } = {}) {
+  if (activeProtectClient) return activeProtectClient;
+  let sessionError = null;
+  if (allowAccessSession && activeClient) {
+    try {
+      const protect = new ProtectClient(activeClient);
+      await protect.getBootstrap();
+      activeProtectClient = protect;
+      return protect;
+    } catch (error) {
+      sessionError = error;
+    }
+  }
+  let consoleClient = null;
+  if (settings.protectHost && settings.protectUsername) {
+    const password = await store.readProtectPassword();
+    if (password) {
+      consoleClient = new UniFiClient(settings.protectHost);
+      await consoleClient.login(settings.protectUsername, password);
+    }
+  }
+  if (!consoleClient) {
+    if (sessionError) throw sessionError;
+    return null;
+  }
+  const protect = new ProtectClient(consoleClient);
+  await protect.getBootstrap();
+  activeProtectClient = protect;
+  return protect;
+}
+
+async function discoverSavedDevices() {
+  const settings = await store.readSettings();
+  const client = await ensureClient();
+  const experimental = Boolean(settings.experimentalScreenDevices);
+  const access = await accessDevicesFor(client, experimental);
+  let protect = [];
+  let protectStatus = {
+    state: experimental ? "not-connected" : "disabled",
+    message: experimental
+      ? "Protect discovery is not connected."
+      : "Experimental screen discovery is disabled.",
+  };
+  if (experimental) {
+    try {
+      const protectClient = await ensureProtectClient(settings);
+      if (protectClient) {
+        protect = await protectClient.listDevices();
+        protectStatus = {
+          state: "connected",
+          message: "Protect discovery is available.",
+        };
+      }
+    } catch (error) {
+      activeProtectClient = null;
+      protectStatus = {
+        state: [401, 403].includes(error.status) ? "permission-required" : "error",
+        message: [401, 403].includes(error.status)
+          ? "This account cannot read Protect devices. Add a separate Protect sign in in Settings."
+          : error.message,
+      };
+    }
+  }
+  return {
+    profile: profileSummary(await client.getProfile()),
+    devices: mergeDiscoveredDevices(access.devices, protect),
+    accessStatus: access.status,
+    protectStatus,
+  };
+}
+
+async function connectProtect(credentials) {
+  const settings = await store.readSettings();
+  const host = normalizeConsoleAddress(credentials.host || settings.host);
+  if (!settings.host) {
+    throw new Error("Connect the Access console first.");
+  }
+  if (host !== normalizeConsoleAddress(settings.host)) {
+    throw new Error("Protect must use the same UniFi console address.");
+  }
+  const client = new UniFiClient(host);
+  await client.login(credentials.username, credentials.password);
+  const protect = new ProtectClient(client);
+  const devices = await protect.listDevices();
+  activeProtectClient = protect;
+  await store.saveProtectConnection({
+    host,
+    username: credentials.username,
+    password: credentials.password,
+    rememberSignIn: Boolean(credentials.rememberSignIn),
+  });
+  return {
+    devices,
+    protectStatus: {
+      state: "connected",
+      message: "Protect discovery is available.",
+    },
+  };
 }
 
 function assertPreparedPath(filePath) {
@@ -101,6 +298,29 @@ function assertPreparedPath(filePath) {
     throw new Error("The prepared image path is outside the application workspace.");
   }
   return resolved;
+}
+
+async function clearArtworkCache() {
+  await fs.rm(artworkCacheDirectory, { recursive: true, force: true });
+  await fs.mkdir(artworkCacheDirectory, { recursive: true });
+}
+
+async function readCachedArtwork(cacheKey, artworkUrl) {
+  const digest = crypto.createHash("sha256").update(String(cacheKey)).digest("hex");
+  const cachePath = path.join(artworkCacheDirectory, `${digest}.json`);
+  try {
+    const cached = JSON.parse(await fs.readFile(cachePath, "utf8"));
+    if (cached.url === artworkUrl && cached.dataUrl) return cached;
+  } catch {
+    // A missing or stale cache entry is rebuilt from the authenticated console.
+  }
+  return null;
+}
+
+async function writeCachedArtwork(cacheKey, artwork) {
+  const digest = crypto.createHash("sha256").update(String(cacheKey)).digest("hex");
+  const cachePath = path.join(artworkCacheDirectory, `${digest}.json`);
+  await fs.writeFile(cachePath, JSON.stringify(artwork), "utf8");
 }
 
 function safeExternalUrl(value) {
@@ -152,33 +372,76 @@ async function createWindow() {
 function registerHandlers() {
   ipcMain.handle("settings:get", () => store.readSettings());
   ipcMain.handle("settings:save", async (_event, settings) => store.saveSettings(settings));
+  ipcMain.handle("settings:set-experimental", async (_event, enabled) => {
+    if (!enabled) activeProtectClient = null;
+    return store.setExperimentalScreenDevices(Boolean(enabled));
+  });
   ipcMain.handle("settings:remove-connection", async () => {
     activeClient = null;
+    activeProtectClient = null;
+    await clearArtworkCache();
     return store.removeConnection();
   });
   ipcMain.handle("settings:remove-all", async () => {
     activeClient = null;
+    activeProtectClient = null;
+    await clearArtworkCache();
     return store.removeAll();
   });
   ipcMain.handle("history:list", () => store.listHistory());
   ipcMain.handle("donation:get", () => readDonation());
 
   ipcMain.handle("console:connect", async (_event, credentials) => {
-    const result = await connect(credentials.host, credentials.username, credentials.password);
+    const settings = await store.readSettings();
+    const result = await connect(
+      credentials.host,
+      credentials.username,
+      credentials.password,
+      { experimentalScreenDevices: settings.experimentalScreenDevices },
+    );
     return result;
   });
 
-  ipcMain.handle("console:refresh-devices", async () => {
-    const client = await ensureClient();
-    return {
-      profile: profileSummary(await client.getProfile()),
-      devices: await client.listDevices(),
-    };
-  });
+  ipcMain.handle("console:refresh-devices", () => discoverSavedDevices());
 
   ipcMain.handle("console:test-saved", async () => {
     await ensureClient();
     return { ok: true };
+  });
+
+  ipcMain.handle("protect:connect", async (_event, credentials) => {
+    return connectProtect(credentials);
+  });
+
+  ipcMain.handle("device:artwork", async (_event, artworkUrl, cacheKey) => {
+    const cached = await readCachedArtwork(cacheKey || artworkUrl, artworkUrl);
+    if (cached) return { dataUrl: cached.dataUrl, bytes: cached.bytes };
+    let artwork;
+    if (activeProtectClient) {
+      artwork = await activeProtectClient.getDeviceArtwork(artworkUrl);
+    } else {
+      const client = await ensureClient();
+      artwork = await client.getDeviceArtwork(artworkUrl);
+    }
+    await writeCachedArtwork(cacheKey || artworkUrl, {
+      url: artworkUrl,
+      dataUrl: artwork.dataUrl,
+      bytes: artwork.bytes,
+    });
+    return artwork;
+  });
+
+  ipcMain.handle("image:inspect", async (_event, sourcePath) => {
+    if (!sourcePath) throw new Error("Choose an image first.");
+    const extension = path.extname(sourcePath).toLowerCase();
+    if (!allowedImageExtensions.has(extension)) {
+      throw new Error("Choose a GIF, PNG, JPEG, WebP, AVIF, or TIFF image.");
+    }
+    const stat = await fs.stat(sourcePath);
+    if (stat.size > 80 * 1024 * 1024) {
+      throw new Error("The selected image is larger than 80 MB.");
+    }
+    return inspectImage(sourcePath);
   });
 
   ipcMain.handle("image:process", async (_event, payload) => {
@@ -206,24 +469,43 @@ function registerHandlers() {
   });
 
   ipcMain.handle("publish:apply", async (_event, payload) => {
-    const client = await ensureClient();
     const preparedPath = assertPreparedPath(payload.preparedPath);
     const settings = await store.readSettings();
-    const deviceId = payload.deviceId || settings.deviceId;
+    const deviceId = payload.deviceId;
     if (!deviceId) throw new Error("Choose a compatible device first.");
-    const backup = await client.captureBackground(deviceId);
-    const uploaded = await client.publish(deviceId, preparedPath, backup);
-    const record = {
-      ...backup,
-      uploadedPath: uploaded.uploadedPath,
-      preparedDigest: payload.digest,
-      sourceName: payload.sourceName || path.basename(preparedPath),
-      preview: payload.preview || "",
-    };
+    let record;
+    if (payload.transport === "protect-lcd") {
+      const protect = await ensureProtectClient(settings);
+      if (!protect) throw new Error("Connect Protect in Settings before publishing this device.");
+      const backup = await protect.captureWelcome(deviceId);
+      const uploaded = await protect.publish(deviceId, preparedPath, backup);
+      record = {
+        ...backup,
+        transport: "protect-lcd",
+        uploadedAsset: uploaded.uploadedAsset,
+        preparedDigest: payload.digest,
+        sourceName: payload.sourceName || path.basename(preparedPath),
+        preview: payload.preview || "",
+      };
+    } else if (payload.transport === "access-background") {
+      const client = await ensureClient();
+      const backup = await client.captureBackground(deviceId);
+      const uploaded = await client.publish(deviceId, preparedPath, backup);
+      record = {
+        ...backup,
+        transport: "access-background",
+        uploadedPath: uploaded.uploadedPath,
+        preparedDigest: payload.digest,
+        sourceName: payload.sourceName || path.basename(preparedPath),
+        preview: payload.preview || "",
+      };
+    } else {
+      throw new Error("This device does not expose a supported upload path.");
+    }
     const backupPath = await store.saveBackup(record);
     await store.addHistory({
       deviceId,
-      deviceName: backup.deviceName,
+      deviceName: record.deviceName,
       sourceName: record.sourceName,
       digest: record.preparedDigest,
       status: "published",
@@ -232,11 +514,19 @@ function registerHandlers() {
   });
 
   ipcMain.handle("publish:restore", async (_event, backup) => {
-    const client = await ensureClient();
     if (!backup?.deviceId || !backup?.backupPath) {
       throw new Error("The rollback record is incomplete.");
     }
-    const restored = await client.restore(backup.deviceId, backup, backup.uploadedPath);
+    let restored;
+    if (backup.transport === "protect-lcd") {
+      const settings = await store.readSettings();
+      const protect = await ensureProtectClient(settings);
+      if (!protect) throw new Error("Connect Protect before restoring this display.");
+      restored = await protect.restore(backup.deviceId, backup.previousLcdMessage);
+    } else {
+      const client = await ensureClient();
+      restored = await client.restore(backup.deviceId, backup, backup.uploadedPath);
+    }
     if (!restored) throw new Error("The original background could not be verified after restore.");
     await store.removeBackup(backup.backupPath);
     await store.addHistory({
@@ -270,7 +560,9 @@ app.whenReady().then(async () => {
   store = new SettingsStore(app.getPath("userData"), safeStorage);
   await store.initialize();
   preparedDirectory = path.join(app.getPath("temp"), "loopframe-prepared");
+  artworkCacheDirectory = path.join(app.getPath("userData"), "artwork-cache");
   await fs.mkdir(preparedDirectory, { recursive: true });
+  await fs.mkdir(artworkCacheDirectory, { recursive: true });
   registerHandlers();
   await createWindow();
 

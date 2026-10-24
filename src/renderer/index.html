@@ -99,7 +99,7 @@
 
           <section class="device-section" id="device-section" hidden>
             <header>
-              <div><h2>Compatible device</h2><p>Choose the screen where the background should appear.</p></div>
+              <div><h2>Detected screen device</h2><p>Choose the panel to preview or publish.</p></div>
               <span class="badge" id="device-count">0 found</span>
             </header>
             <div class="device-list" id="device-list" role="radiogroup" aria-label="Compatible device"></div>
@@ -120,7 +120,10 @@
 
         <aside class="setup-aside">
           <section class="panel compact-panel">
-            <span class="panel-icon"><i data-lucide="door-open"></i></span>
+            <div class="aside-device-visual">
+              <img id="aside-device-artwork" alt="" hidden>
+              <span class="device-art-fallback"><i data-lucide="door-open"></i></span>
+            </div>
             <h2 id="aside-device-name">No device selected</h2>
             <p id="aside-device-meta">Connect to list compatible Access hardware.</p>
             <dl class="facts">
@@ -175,16 +178,37 @@
 
         <section class="stage-panel" aria-label="Background preview">
           <header class="stage-head">
-            <div><span class="eyebrow">Screen 225 by 400</span><h2>Output preview</h2></div>
+            <div class="stage-identity">
+              <span class="stage-device-art">
+                <img id="selected-device-artwork" alt="" hidden>
+                <span class="device-art-fallback"><i data-lucide="door-open"></i></span>
+              </span>
+              <div><span class="eyebrow" id="screen-size-label">Device screen</span><h2>Camera preview</h2></div>
+            </div>
             <span class="status" id="preview-status"><span class="status-dot"></span><span>Waiting for an image</span></span>
           </header>
           <div class="stage">
-            <div class="device">
-              <div class="device-camera"></div>
-              <div class="screen">
-                <div class="empty-preview" id="output-empty"><i data-lucide="scan-line"></i><span>Your framed GIF appears here</span></div>
-                <img id="output-preview" alt="Processed background preview" hidden>
-                <div class="safe-grid" id="safe-grid"></div>
+            <div class="stage-layout">
+              <figure class="device-reference">
+                <div class="device-reference-art">
+                  <img id="studio-device-artwork" alt="" hidden>
+                  <span class="device-art-fallback"><i data-lucide="door-open"></i></span>
+                </div>
+                <figcaption>
+                  <strong id="studio-device-name">Detected device</strong>
+                  <span id="studio-device-spec">Waiting for a device</span>
+                  <span class="capability-badge is-experimental" id="studio-device-capability">Preview only</span>
+                </figcaption>
+              </figure>
+              <div class="device">
+                <div class="device-camera"></div>
+                <div class="screen" id="preview-screen" tabindex="0" aria-label="Drag the image to reposition it">
+                  <div class="empty-preview" id="output-empty"><i data-lucide="scan-line"></i><span>Your framed GIF appears here</span></div>
+                  <img id="output-preview" alt="Animated background preview" hidden>
+                  <div class="template-overlay" id="template-overlay"></div>
+                  <div class="safe-grid" id="safe-grid"></div>
+                  <span class="drag-hint" id="drag-hint" hidden><i data-lucide="move"></i>Drag to position</span>
+                </div>
               </div>
             </div>
           </div>
@@ -200,6 +224,7 @@
         <aside class="panel inspector">
           <section class="inspector-section">
             <header><h2>Scale</h2><button class="text-button" id="reset-transform" type="button">Reset</button></header>
+            <p class="section-help">Show all keeps the complete picture visible. Fill screen uses the whole display and trims the edges that do not fit.</p>
             <div class="fit-grid" id="fit-grid"></div>
           </section>
           <section class="inspector-section">
@@ -212,14 +237,10 @@
               <span>Zoom</span>
               <input id="zoom" type="range" min="25" max="250" step="1" value="100">
             </label>
-            <label class="range-row">
-              <span>Horizontal</span>
-              <input id="offset-x" type="range" min="-100" max="100" step="1" value="0">
-            </label>
-            <label class="range-row">
-              <span>Vertical</span>
-              <input id="offset-y" type="range" min="-100" max="100" step="1" value="0">
-            </label>
+            <div class="reposition-note">
+              <i data-lucide="hand"></i>
+              <span><strong>Drag the camera preview</strong><small>Move left, right, up, or down with a mouse or one finger.</small></span>
+            </div>
             <label class="field color-field">
               <span>Background</span>
               <span class="color-input"><input id="background-color" type="color" value="#111612"><output id="background-value">#111612</output></span>
@@ -229,6 +250,7 @@
             <header><h2>Device</h2></header>
             <select id="device-select" aria-label="Publish device"></select>
             <p class="muted" id="device-connection">Connect to select a device.</p>
+            <p class="capability-copy" id="device-capability-copy"></p>
           </section>
           <button class="button primary publish-button" id="review-publish" type="button" disabled><i data-lucide="upload"></i><span>Review upload</span></button>
         </aside>
@@ -249,6 +271,7 @@
             <div><dt>Account</dt><dd id="settings-user">Not configured</dd></div>
             <div><dt>Device</dt><dd id="settings-device">Not selected</dd></div>
             <div><dt>Saved sign in</dt><dd id="settings-secret">Not stored</dd></div>
+            <div><dt>Protect sign in</dt><dd id="settings-protect-secret">Not stored</dd></div>
           </dl>
           <div class="settings-actions">
             <button class="button" id="edit-connection" type="button"><i data-lucide="pencil"></i><span>Edit connection</span></button>
@@ -268,6 +291,49 @@
           </ul>
           <button class="button danger" id="remove-all" type="button"><i data-lucide="trash-2"></i><span>Delete all local data</span></button>
         </section>
+        <section class="panel settings-panel experimental-panel">
+          <header class="panel-head">
+            <div>
+              <span class="eyebrow">Experimental</span>
+              <h2>Screen devices from Access and Protect</h2>
+              <p>Off by default. Adds detected Protect welcome displays and other screen hardware that has not completed a full release test.</p>
+            </div>
+            <span class="badge">Experimental</span>
+          </header>
+          <label class="experiment-toggle">
+            <input id="experimental-screen-devices" type="checkbox" role="switch">
+            <span>
+              <strong>Enable experimental screen discovery</strong>
+              <small>Only devices detected on the connected console are shown. Access background devices continue to use their existing route.</small>
+            </span>
+          </label>
+          <div class="protect-connection" id="protect-connection" hidden>
+            <div>
+              <h3>Protect connection</h3>
+              <p id="protect-status-copy">Protect discovery is not connected.</p>
+            </div>
+            <div class="protect-connect-controls" id="protect-connect-controls">
+              <div class="form-grid protect-form" id="protect-credentials">
+                <label class="field">
+                  <span>Protect username or email</span>
+                  <span class="input-wrap"><i data-lucide="user-round"></i><input id="protect-user" type="text" autocomplete="username"></span>
+                </label>
+                <label class="field">
+                  <span>Protect password</span>
+                  <span class="input-wrap"><i data-lucide="key-round"></i><input id="protect-password" type="password" autocomplete="current-password" placeholder="Only needed when Protect access is separate"></span>
+                </label>
+              </div>
+              <label class="check-row">
+                <input id="protect-remember-signin" type="checkbox">
+                <span><strong>Keep the Protect sign in</strong><small>Stored with the same protected credential service used by the Access connection.</small></span>
+              </label>
+              <div class="settings-actions">
+                <button class="button" id="connect-protect" type="button"><i data-lucide="plug-zap"></i><span>Connect Protect</span></button>
+                <span class="inline-status" id="protect-connection-status">Not checked</span>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </section>
   </main>
@@ -284,12 +350,15 @@
         <div><p class="eyebrow">Final check</p><h2>Publish this GIF?</h2></div>
         <button class="icon-button" value="cancel" aria-label="Close"><i data-lucide="x"></i></button>
       </header>
-      <div class="dialog-preview"><img id="dialog-preview" alt="Prepared GIF"></div>
+      <div class="camera-preview" id="dialog-screen">
+        <img id="dialog-preview" alt="Animated camera preview">
+      </div>
       <dl class="facts wide">
         <div><dt>Device</dt><dd id="dialog-device">Not selected</dd></div>
         <div><dt>Output</dt><dd id="dialog-output">Not prepared</dd></div>
         <div><dt>Template</dt><dd id="dialog-template">No overlay</dd></div>
         <div><dt>Digest</dt><dd id="dialog-digest">Not prepared</dd></div>
+        <div><dt>Upload path</dt><dd id="dialog-upload-status">Not available</dd></div>
       </dl>
       <div class="notice compact">
         <span class="notice-icon"><i data-lucide="history"></i></span>

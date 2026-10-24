@@ -10,6 +10,7 @@ const {
   TEMPLATES,
   TARGET_WIDTH,
   TARGET_HEIGHT,
+  inspectImage,
   processImage,
 } = require("../src/image-processor.cjs");
 
@@ -222,13 +223,41 @@ test("the preview is generated from the same rendered GIF", async () => {
     offsetX: -20,
     offsetY: 15,
   });
-  assert.match(result.preview, /^data:image\/png;base64,/);
+  assert.match(result.preview, /^data:image\/gif;base64,/);
   const preview = Buffer.from(result.preview.split(",")[1], "base64");
   const metadata = await sharp(preview).metadata();
   const stats = await sharp(preview).stats();
-  assert.equal(metadata.width, 450);
-  assert.equal(metadata.height, 800);
+  assert.equal(metadata.width, TARGET_WIDTH);
+  assert.equal(metadata.height, TARGET_HEIGHT);
+  assert.equal(metadata.pages, 4);
+  assert.equal(Buffer.compare(preview, result.buffer), 0);
   assert.ok(stats.channels[0].mean + stats.channels[1].mean + stats.channels[2].mean > 30);
+});
+
+test("the source is inspected without rendering a replacement file", async () => {
+  const metadata = await inspectImage(animatedGif);
+  assert.equal(metadata.width, 120);
+  assert.equal(metadata.height, 240);
+  assert.equal(metadata.frames, 4);
+  assert.equal(metadata.durationMs, 540);
+  assert.equal(metadata.format, "gif");
+});
+
+test("every catalog display renders at its exact panel dimensions", async () => {
+  const catalog = require("../src/device-screen-catalog.json");
+  for (const entry of catalog.screenDevices) {
+    const result = await processImage(animatedGif, {
+      fit: "contain",
+      template: "none",
+      zoom: 100,
+      targetWidth: entry.screen.width,
+      targetHeight: entry.screen.height,
+    });
+    assert.equal(result.output.width, entry.screen.width, entry.name);
+    assert.equal(result.output.height, entry.screen.height, entry.name);
+    assert.equal(result.options.targetWidth, entry.screen.width, entry.name);
+    assert.equal(result.options.targetHeight, entry.screen.height, entry.name);
+  }
 });
 
 test("option values are bounded before rendering", async () => {

@@ -6,11 +6,17 @@ const path = require("node:path");
 const test = require("node:test");
 const { UniFiClient } = require("../src/unifi-client.cjs");
 
+const onePixelPng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+
 async function createMockConsole() {
   const calls = [];
   let currentBg = "backgrounds/original.png";
   let currentBgs = "backgrounds/original.png,backgrounds/second.png";
   let failNextSettings = false;
+  let origin;
 
   const server = http.createServer(async (request, response) => {
     const chunks = [];
@@ -65,6 +71,46 @@ async function createMockConsole() {
               { key: "bg", value: currentBg },
               { key: "bgs", value: currentBgs },
             ],
+            images: {
+              l: `${origin}/device-artwork.png`,
+              xxl: `${origin}/device-artwork.png`,
+            },
+          },
+          {
+            unique_id: "intercom-1",
+            name: "Side entrance",
+            device_type: "UA G3 Intercom",
+            model: "G3 Intercom",
+            is_camera: true,
+            is_connected: true,
+            configs: [
+              { key: "bg", value: "backgrounds/intercom.png" },
+              { key: "bgs", value: "backgrounds/intercom.png" },
+            ],
+            images: {
+              xxl: `${origin}/device-artwork.png`,
+            },
+          },
+          {
+            unique_id: "camera-without-screen",
+            name: "Camera only",
+            device_type: "UVC G6 Entry",
+            model: "G6 Entry",
+            is_camera: true,
+            is_connected: true,
+            configs: [
+              { key: "bg", value: "backgrounds/camera.png" },
+              { key: "bgs", value: "backgrounds/camera.png" },
+            ],
+          },
+          {
+            unique_id: "reader-no-background-route",
+            name: "Staff door reader",
+            device_type: "UA-G2-Pro",
+            model: "G2 Reader Pro",
+            is_camera: false,
+            is_connected: true,
+            configs: [],
           },
           {
             unique_id: "hub-1",
@@ -116,13 +162,20 @@ async function createMockConsole() {
       return;
     }
 
+    if (request.method === "GET" && url.pathname === "/device-artwork.png") {
+      response.writeHead(200, { "Content-Type": "image/png" });
+      response.end(onePixelPng);
+      return;
+    }
+
     send(404, { code: 0, msg: "not found" });
   });
 
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
+  origin = `http://127.0.0.1:${address.port}`;
   return {
-    origin: `http://127.0.0.1:${address.port}`,
+    origin,
     calls,
     setFailure: () => {
       failNextSettings = true;
@@ -141,9 +194,33 @@ test("the client discovers only compatible devices and restores the exact backgr
     const client = new UniFiClient(mock.origin);
     const profile = await client.login("loopframe-test", "test-password");
     assert.equal(profile.username, "loopframe-test");
-    const devices = await client.listDevices();
-    assert.equal(devices.length, 1);
-    assert.equal(devices[0].id, "doorbell-1");
+    const stableDevices = await client.listDevices();
+    assert.equal(stableDevices.length, 1);
+    assert.equal(stableDevices[0].id, "access:doorbell-1");
+    const devices = await client.listDevices({ experimental: true });
+    assert.equal(devices.length, 3);
+    assert.equal(devices[0].id, "access:doorbell-1");
+    assert.equal(devices[0].deviceId, "doorbell-1");
+    assert.equal(devices[0].upload.status, "verified");
+    assert.equal(devices[0].screen.width, 480);
+    assert.equal(devices[0].screen.height, 854);
+    assert.equal(
+      devices[0].artworkUrl,
+      `${mock.origin}/device-artwork.png`,
+    );
+    assert.equal(devices[1].id, "access:intercom-1");
+    assert.equal(devices[1].upload.status, "experimental");
+    assert.equal(devices[1].screen.width, 600);
+    assert.equal(devices[1].screen.height, 1024);
+    assert.equal(devices[2].id, "access:reader-no-background-route");
+    assert.equal(devices[2].screen.width, 286);
+    assert.equal(devices[2].screen.height, 1280);
+    assert.equal(devices[2].upload.status, "unsupported");
+    assert.ok(!devices.some((device) => device.id === "camera-without-screen"));
+
+    const artwork = await client.getDeviceArtwork(devices[0].artworkUrl);
+    assert.match(artwork.dataUrl, /^data:image\/png;base64,/);
+    assert.equal(artwork.bytes, onePixelPng.length);
 
     const backup = await client.captureBackground("doorbell-1");
     assert.equal(backup.previousBg, "backgrounds/original.png");

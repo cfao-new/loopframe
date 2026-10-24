@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-10-24T15:15:00.048Z",
+  "startedAt": "2026-10-24T18:22:31.116Z",
   "status": "passed",
   "account": {
     "created": true,
@@ -18,6 +18,10 @@
   "matrixCases": 30,
   "staticFormatCases": 5,
   "rollbackChecks": 35,
+  "experimentalDiscovery": {
+    "accessOnlyProtectDenied": true,
+    "detectedAccessScreenDevices": 2
+  },
   "fits": [
     "fill",
     "contain",
@@ -39,6 +43,6 @@
   "roleDeleted": true,
   "usersRestored": true,
   "rolesRestored": true,
-  "temporaryDirectory": ".loopframe-test\\live-2854900041",
-  "completedAt": "2026-10-24T15:16:50.748Z"
+  "temporaryDirectory": ".loopframe-test\\live-2866151109",
+  "completedAt": "2026-10-24T18:24:18.445Z"
 }

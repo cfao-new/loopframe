@@ -10,15 +10,22 @@ account you choose.
 ## What It Does
 
 1. Signs in to one UniFi OS console with a local account.
-2. Finds Access devices that expose background controls.
-3. Opens GIF, PNG, JPEG, WebP, AVIF, and TIFF files from their current folder.
-4. Frames the image with six scale modes, zoom, horizontal and vertical
-   position, background color, and five optional overlays.
-5. Renders an animated GIF at 225 by 400 pixels.
-6. Shows the exact prepared output before publication.
-7. Saves the current device background before changing it.
-8. Restores the previous background and removes the Loopframe upload on
-   request.
+2. Finds Access devices that expose background controls and have a display.
+3. Can discover additional detected Access and Protect screen devices when
+   the experimental setting is enabled.
+4. Opens GIF, PNG, JPEG, WebP, AVIF, and TIFF files from their current folder.
+5. Shows an immediate animated preview at the selected panel shape.
+6. Moves the image with a mouse, touch, or the arrow keys.
+7. Frames the image with six scale modes, zoom, background color, and five
+   optional overlays.
+8. Fetches the product image supplied by the signed in Access or Protect
+   device record.
+9. Renders the final animated GIF at the exact display dimensions.
+10. Shows the complete animated output before publication.
+11. Saves the previous Access background or Protect LCD message before
+    changing it.
+12. Restores the previous background or LCD message and removes the Loopframe
+    Access upload on request.
 
 ![Connection setup](docs/screenshots/setup.png)
 
@@ -45,13 +52,53 @@ and Door Attendant cannot change a device background.
 
 The setup screen contains the same guidance inside the application.
 
+When experimental screen discovery is enabled, a separate Protect account is
+requested only if the current Access account cannot read Protect devices. The
+Protect password uses the same protected credential service and is stored only
+when the user asks to keep it.
+
+## Supported Displays
+
+The built in catalog contains the six confirmed screen models. The app shows
+only devices that are detected on the connected console.
+
+| Device | Studio canvas | Native panel | Status |
+| --- | --- | --- | --- |
+| G4 Doorbell Pro | 240 by 240 fallback | Unpublished | Protect experimental, animation unverified |
+| G6 Pro Entry | 480 by 854 | 480 by 854 | Access verified, animation verified |
+| Access G3 Intercom | 600 by 1024 | 1024 by 600 | Access experimental |
+| Access Intercom, previous generation | 600 by 1024 | 1024 by 600 | Access experimental |
+| Access Intercom Viewer | 720 by 1280 | 1280 by 720 | Access experimental |
+| Access G2 Reader Pro | 286 by 1280 | 1280 by 286 | Access experimental |
+
+UniFi lists several panels in their native landscape order while describing
+the display orientation as portrait. Loopframe stores both forms and uses the
+portrait canvas. A device value takes priority over the catalog.
+
+The G4 Doorbell Pro resolution is not published by UniFi. The studio marks the
+240 by 240 community fallback as unverified until the connected device
+reports a value.
+
+Access devices remain preview only when they do not expose `bg` and `bgs`.
+Protect image support is experimental for the G4 Doorbell Pro until that model
+completes a hardware test. See
+[`docs/EXPERIMENTAL_DEVICES.md`](docs/EXPERIMENTAL_DEVICES.md) for the full
+capability matrix and API notes.
+
+The source links and model aliases are in
+[`src/device-screen-catalog.json`](src/device-screen-catalog.json). Product
+artwork is not copied into this repository. Loopframe downloads the image
+returned by the Access or Protect device record while the user is signed in,
+then caches it only in the current user's application data folder.
+
 ## Run From Source
 
 Requirements:
 
 1. Node.js 22 or newer.
 2. A UniFi OS console with the Access application.
-3. A compatible Access intercom or display.
+3. A compatible Access screen device. Protect is optional for experimental
+   screen discovery.
 
 Install and start:
 
@@ -78,14 +125,16 @@ user's operating system credential protection.
 | Original size | Keeps source pixels at their original size |
 | Stretch | Forces the source to the display shape |
 | Zoom | Scales the framed result from 25 to 250 percent |
-| Horizontal | Moves the image from left to right |
-| Vertical | Moves the image from top to bottom |
+| Position | Drag the preview with a mouse or one finger |
+| Fine position | Focus the preview and use the arrow keys |
 | Background | Fills visible space around the source |
 
 Available overlays are **No overlay**, **Bottom fade**, **Top fade**,
 **Soft vignette**, and **Focus frame**.
 
 ![Settings and rollback](docs/screenshots/settings.png)
+
+![Experimental screen devices](docs/screenshots/studio-experimental.png)
 
 ## Tests
 
@@ -145,7 +194,9 @@ Open **Settings** to:
 1. Test the saved console connection.
 2. Restore a background saved by Loopframe.
 3. Remove the saved console and sign in.
-4. Delete every Loopframe preference and rollback record.
+4. Disable experimental screen discovery.
+5. Delete the separate Protect sign in.
+6. Delete every Loopframe preference, rollback record, and cached artwork.
 
 Removing local data does not change the controller unless you choose a
 rollback action first.
@@ -160,6 +211,9 @@ configuration steps. The recommended service for Portugal is **Ko-fi** because
 it supports PayPal and Stripe payments, direct settlement to your payment
 account, and a free page for basic tips.
 
+The configured support page for this release is
+[`buymeacoffee.com/cfao`](https://buymeacoffee.com/cfao).
+
 ## Privacy
 
 Loopframe connects directly to the console address you enter. It has no
@@ -172,6 +226,14 @@ user's application data folder.
 The background upload uses private Access routes used by the UniFi Access web
 interface. A future Access release may change those routes. The published
 Access Open API does not currently expose animated background upload.
+
+The Protect welcome image route follows the published Protect 7.3 API. The G4
+Doorbell Pro path remains experimental and its animation result is unverified
+until that model is tested on real hardware.
+
+The Protect API does not publish a delete operation for uploaded device assets.
+The previous on screen message is restored, but the uploaded file can remain in
+the Protect asset library.
 
 ## License
 
