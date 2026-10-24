@@ -156,9 +156,9 @@ The application supports one optional footer link. It does not show a modal,
 auto prompt, floating badge, or startup message.
 
 See [docs/DONATIONS.md](docs/DONATIONS.md) for the service comparison and
-configuration steps. The recommended service is **Buy Me a Coffee** because
-the donor flow is short and the public page works well across unrelated
-applications.
+configuration steps. The recommended service for Portugal is **Ko-fi** because
+it supports PayPal and Stripe payments, direct settlement to your payment
+account, and a free page for basic tips.
 
 ## Privacy
 

@@ -162,7 +162,7 @@ await createSourceGif();
 await fs.mkdir(screenshotDirectory, { recursive: true });
 await fs.writeFile(donationPath, JSON.stringify({
   enabled: true,
-  service: "Buy Me a Coffee",
+  service: "Ko-fi",
   label: "Support this project",
   url: "https://example.com/support",
   placement: "footer",

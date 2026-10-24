@@ -6,20 +6,22 @@ support during setup or publication.
 
 ## Recommendation
 
-Use **Buy Me a Coffee** as the shared donation service for these applications.
+Use **Ko-fi** as the shared donation service for these applications in
+Portugal.
 
 Why it fits:
 
-1. The donor page is familiar and requires no application account.
-2. It supports a simple contribution flow and optional recurring support.
-3. One public address can be used from several unrelated projects.
-4. The service handles payment methods and provides a public supporter page.
+1. Ko-fi supports both PayPal and Stripe for Portuguese creators.
+2. Payments can settle directly to your own PayPal or Stripe account.
+3. The free page supports basic tips with payment provider fees only.
+4. One public address can be used from several unrelated projects.
+5. The donor flow is short and does not require an application account.
 
-Ko-fi is the best alternative when the priority is a free public page with
-payment processing fees taken by the payment provider. GitHub Sponsors is a
-good fit for developer focused projects, but donors need a GitHub account.
-Stripe Payment Links offer the most control, but require more setup and a less
-familiar donation experience.
+Buy Me a Coffee is the best alternative when brand recognition is more
+important than lower platform cost. Buy Me a Coffee supports payouts in
+Portugal through Stripe. GitHub Sponsors is a good fit for developer focused
+projects, but donors need a GitHub account. Stripe Payment Links offer the most
+control, but require more setup and a less familiar donation experience.
 
 Review current service fees before creating an account because providers can
 change their terms.
@@ -28,26 +30,26 @@ change their terms.
 
 | Service | Strengths | Tradeoffs | Best fit |
 | --- | --- | --- | --- |
-| Buy Me a Coffee | Familiar brand, very short donor flow, one time support, optional monthly support, good share link | Platform fee plus payment processing costs, hosted branding, payout availability varies by country | Broad consumer audience and many unrelated applications |
-| Ko-fi | Free page, low platform cost for direct donations, card and payment provider choices, optional shop and memberships | Donor may leave the page for payment, some options require a paid plan, provider account setup is still required | Fee conscious creators with a community or storefront |
+| Buy Me a Coffee | Familiar brand, very short donor flow, one time support, optional monthly support, good share link, official payouts in Portugal | Platform fee plus payment processing costs and hosted branding | Broad consumer audience and many unrelated applications |
+| Ko-fi | Free page for tips, PayPal and Stripe options, direct settlement to the selected payment account, optional shop and memberships | Payment provider setup is required, some advanced options require a paid plan, interface has fewer consumer brand cues | Portugal and fee conscious creators with a community or storefront |
 | GitHub Sponsors | Trusted by developers, strong repository integration, recurring tiers, organization matching in some regions | Donors need GitHub accounts, eligibility review, tax and payout onboarding, less approachable for general consumers | Open source projects with a developer audience |
 
-Use Buy Me a Coffee for the Loopframe footer if the goal is the shortest donor
-path. Use Ko-fi if lower platform cost matters more than the most recognizable
-brand. Use GitHub Sponsors only as a second channel for developers.
+Use Ko-fi for the Loopframe footer in Portugal. Use Buy Me a Coffee if the
+shortest, most familiar donor path matters more than lower platform cost. Use
+GitHub Sponsors only as a second channel for developers.
 
 ## Suggested Setup
 
-1. Create a Buy Me a Coffee account with the same public brand used by these
+1. Create a Ko-fi account with the same public brand used by these
    applications.
-2. Set the page name to `cfao`.
+2. Set the page name to `cfao` if it is available.
 3. Add a short description that covers small independent tools.
-4. Connect a payment account and complete the provider's payout checks.
+4. Connect PayPal, Stripe, or both and complete the provider's payout checks.
 5. Copy the public page address.
 6. Run the configuration helper from this folder:
 
 ```powershell
-node scripts/configure-donation.cjs https://www.buymeacoffee.com/cfao
+node scripts/configure-donation.cjs https://ko-fi.com/your-page
 ```
 
 7. Restart the application or rebuild the package.
