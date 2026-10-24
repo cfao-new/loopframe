@@ -37,14 +37,14 @@ No root access is required after Node.js is installed. To build an AppImage:
 
 ```bash
 npm run pack:linux
-chmod +x dist/Loopframe-0.1.1-x86_64.AppImage
-./dist/Loopframe-0.1.1-x86_64.AppImage
+chmod +x dist/Loopframe-0.1.2-x86_64.AppImage
+./dist/Loopframe-0.1.2-x86_64.AppImage
 ```
 
 If FUSE is unavailable on the target computer, run:
 
 ```bash
-./dist/Loopframe-0.1.1-x86_64.AppImage --appimage-extract-and-run
+./dist/Loopframe-0.1.2-x86_64.AppImage --appimage-extract-and-run
 ```
 
 ## macOS From Source
@@ -75,11 +75,17 @@ The repository includes a GitHub Actions workflow that builds:
 
 1. Windows x64 portable EXE and unpacked ZIP.
 2. Linux x64 AppImage.
-3. macOS Intel ZIP.
-4. macOS Apple Silicon ZIP.
+3. macOS Intel ZIP, with packaged launch coverage on an Intel runner.
+4. macOS Apple Silicon ZIP, with packaged launch coverage on an Apple Silicon
+   runner.
 
 The workflow runs the local tests before creating release packages. A live
 console test is separate because it changes real controller state.
+
+The macOS package step installs the Sharp binaries for both supported Mac
+architectures from the existing lockfile before Electron Builder runs. Both
+packaged ZIPs are therefore self-contained even when built on either Mac
+architecture.
 
 The interface test covers artwork loading, all six catalog sizes at the
 processor level, G6 Pro Entry and G4 Doorbell Pro preview shapes, both upload

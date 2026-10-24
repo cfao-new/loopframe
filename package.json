@@ -1,6 +1,6 @@
 {
   "name": "loopframe",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A local desktop studio for UniFi Access backgrounds and Protect welcome images",
   "main": "src/main.cjs",
   "author": "cfao",
@@ -22,7 +22,9 @@
     "test:packaged": "node tests/packaged-smoke.mjs",
     "pack:win": "electron-builder --win dir --x64 && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-launcher.ps1",
     "pack:linux": "electron-builder --linux AppImage --x64",
-    "pack:mac": "electron-builder --mac zip --x64 --arm64",
+    "pack:mac": "node scripts/install-mac-sharp.cjs && electron-builder --mac zip --x64 --arm64",
+    "pack:mac:x64": "node scripts/install-mac-sharp.cjs && electron-builder --mac zip --x64",
+    "pack:mac:arm64": "node scripts/install-mac-sharp.cjs && electron-builder --mac zip --arm64",
     "pack:dir": "electron-builder --dir"
   },
   "dependencies": {

@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { _electron as electron } from "playwright";
+import electronPath from "electron";
 import gifenc from "gifenc";
 import sharp from "sharp";
 
@@ -279,13 +280,7 @@ let electronApp;
 
 try {
   electronApp = await electron.launch({
-    executablePath: path.join(
-      projectRoot,
-      "node_modules",
-      "electron",
-      "dist",
-      process.platform === "win32" ? "electron.exe" : "electron",
-    ),
+    executablePath: electronPath,
     args: [projectRoot, "--disable-gpu"],
     env: {
       ...process.env,

@@ -29,9 +29,6 @@ jobs:
           - os: ubuntu-latest
             name: Linux-x64
             command: npm run pack:linux
-          - os: macos-latest
-            name: macOS
-            command: npm run pack:mac
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -45,3 +42,34 @@ jobs:
         with:
           name: Loopframe-${{ matrix.name }}
           path: dist/*
+
+  package-macos:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run pack:mac:${{ matrix.arch }}
+      - name: Test packaged application
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          archive="dist/Loopframe-${version}-${{ matrix.arch }}-mac.zip"
+          mkdir extracted
+          ditto -x -k "$archive" extracted
+          LOOPFRAME_PACKAGED_EXECUTABLE="$PWD/extracted/Loopframe.app/Contents/MacOS/Loopframe" npm run test:packaged
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Loopframe-macOS-${{ matrix.arch }}
+          path: dist/*-${{ matrix.arch }}-mac.zip
