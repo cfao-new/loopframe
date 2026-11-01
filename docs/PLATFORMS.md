@@ -6,8 +6,8 @@
 | --- | --- | --- | --- |
 | Windows 10 and 11 | Intel or AMD 64 bit | Portable EXE or ZIP | Open the EXE |
 | Linux | Intel or AMD 64 bit | AppImage | Mark executable, then open |
-| macOS 12 or newer | Intel | ZIP | Open Loopframe.app |
-| macOS 12 or newer | Apple Silicon | ZIP | Open Loopframe.app |
+| macOS 12 or newer | Intel | ZIP | Clear quarantine once, then open Loopframe.app |
+| macOS 12 or newer | Apple Silicon | ZIP | Clear quarantine once, then open Loopframe.app |
 
 The application uses Electron, so the desktop runtime behaves consistently on
 all three systems. Settings use the current user's application data folder.
@@ -62,12 +62,36 @@ To build ZIP packages:
 npm run pack:mac
 ```
 
-The command creates separate Intel and Apple Silicon packages. Open the
-resulting ZIP, move Loopframe.app into Applications if desired, and open it.
+The command creates separate Intel and Apple Silicon packages, ad-hoc signed by
+`scripts/after-pack.cjs`. Move the built `Loopframe.app` into Applications and
+open it. A package downloaded from a release also needs the quarantine step
+described below.
 
 Public macOS distribution should use an Apple Developer ID certificate and
-notarization. Without those credentials, macOS may show a Gatekeeper warning.
-This is an Apple platform requirement, not an installation requirement.
+notarization. This project does not have those credentials, so the macOS
+packages are ad-hoc signed only. macOS therefore blocks a freshly downloaded
+copy with Gatekeeper: it either bounces in the Dock or reports that it is
+damaged.
+
+Move `Loopframe.app` out of the download folder and clear the quarantine flag
+once, before the first launch:
+
+```bash
+mkdir -p ~/Applications
+ditto -x -k ~/Downloads/Loopframe-0.1.2-arm64-mac.zip ~/Downloads/loopframe
+mv ~/Downloads/loopframe/Loopframe.app ~/Applications/
+find ~/Applications/Loopframe.app -exec xattr -d com.apple.quarantine {} \;
+open ~/Applications/Loopframe.app
+```
+
+Clear the flag before the first attempt. A copy that macOS has already blocked
+stays blocked after the flag is removed; delete it and extract a fresh one. If
+a Gatekeeper prompt still appears, choose **Open Anyway** under
+**System Settings → Privacy & Security**.
+
+The build ad-hoc signs the bundle in `scripts/after-pack.cjs`, which keeps the
+bundle signature valid. It does not bypass the quarantine check, because only
+a notarized Developer ID signature can do that.
 
 ## Build Matrix
 

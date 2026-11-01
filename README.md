@@ -29,6 +29,69 @@ account you choose.
 
 ![Connection setup](docs/screenshots/setup.png)
 
+## Download And Install
+
+Packages are published on the
+[releases page](https://github.com/cfao-new/loopframe/releases/latest).
+Choose the file for the computer you will run it on:
+
+| System | File |
+| --- | --- |
+| Windows 10 and 11, x64 | `Loopframe-<version>-x64.exe` (portable) or `Loopframe-<version>-win-x64.zip` |
+| Linux, x64 | `Loopframe-<version>-x86_64.AppImage` |
+| macOS, Apple Silicon | `Loopframe-<version>-arm64-mac.zip` |
+| macOS, Intel | `Loopframe-<version>-x64-mac.zip` |
+
+Windows and Linux packages open directly. Linux needs the executable bit set
+before the first launch.
+
+### macOS
+
+Loopframe is not signed with an Apple Developer ID and is not notarized, so
+macOS blocks a freshly downloaded copy with Gatekeeper. A blocked copy either
+bounces in the Dock without opening a window, or reports that it is damaged.
+The application itself is fine; the download quarantine flag is what stops it.
+
+Install it once with these steps:
+
+1. Unzip the download and keep the `Loopframe.app` bundle intact. `ditto`
+   preserves the bundle and its signature:
+
+   ```bash
+   ditto -x -k ~/Downloads/Loopframe-<version>-arm64-mac.zip ~/Downloads/loopframe
+   ```
+
+2. Move the application out of the download folder:
+
+   ```bash
+   mkdir -p ~/Applications
+   mv ~/Downloads/loopframe/Loopframe.app ~/Applications/
+   ```
+
+3. Remove the quarantine flag before the first launch. macOS `xattr` has no
+   recursive option, so use `find`:
+
+   ```bash
+   find ~/Applications/Loopframe.app -exec xattr -d com.apple.quarantine {} \;
+   ```
+
+4. Open Loopframe normally, from Finder or with
+   `open ~/Applications/Loopframe.app`.
+
+Use `/Applications` instead of `~/Applications` if you prefer, as long as the
+folder is writable by your user.
+
+Notes:
+
+- Clear the quarantine flag before the first launch. If macOS already blocked
+  a copy, that copy stays blocked even after the flag is removed. Delete it,
+  extract a fresh copy, and repeat the steps above.
+- If macOS still offers a Gatekeeper prompt, choose **Open Anyway** under
+  **System Settings → Privacy & Security**.
+- A build signed with a Developer ID certificate and notarized by Apple would
+  avoid this step entirely. The published packages use an ad-hoc signature
+  because no Developer ID is available for this project.
+
 ## Account Requirements
 
 Create a dedicated local admin account with only the Access application
@@ -180,9 +243,12 @@ Choose the command for the host system. Windows builds a portable executable
 and unpacked application, Linux builds an AppImage, and macOS builds ZIP files
 for Intel and Apple Silicon.
 
-The output is written to `dist`. macOS packages should be signed and notarized
-before public distribution. See [docs/PLATFORMS.md](docs/PLATFORMS.md) for the
-full release matrix and user instructions.
+The output is written to `dist`. Without Developer ID credentials, the build
+ad-hoc signs the macOS bundle in `scripts/after-pack.cjs` so it has a valid
+signature, but macOS still blocks a quarantined download. Users must clear the
+quarantine flag once, as described in
+[Download And Install](#macos). See [docs/PLATFORMS.md](docs/PLATFORMS.md) for
+the full release matrix.
 
 The Windows executable prepares a private copy in the current user's
 `%LOCALAPPDATA%\Loopframe\app` folder on its first run. Later launches open
